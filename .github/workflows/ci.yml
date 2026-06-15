@@ -3,19 +3,34 @@ name: CI
 on:
   pull_request:
 
+permissions:
+  # Allow GITHUB_TOKEN to add labels to pull requests
+  pull-requests: write
+  issues: write
+  contents: read
+  id-token: write
+
 jobs:
+  label-check:
+    name: Label Check
+    uses: ApolloAutomation/Workflows/.github/workflows/label-check.yml@main
+    
   ci:
-    name: Building ${{ matrix.file }}
+    name: Building ${{ matrix.file }} / ESPHome ${{ matrix.esphome-version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        file: # TODO: Rename
-          - Integrations/ESPHome/PLT-1.yaml
-          - Integrations/ESPHome/PLT-1_BLE.yaml
+        file:
+          - Integrations/ESPHome/CAST-1_ETH.yaml
+          - Integrations/ESPHome/CAST-1_W.yaml
+        esphome-version:
+          - stable
+          - beta
+          - dev
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v5.0.0
       - name: Build ESPHome firmware to verify configuration
-        uses: esphome/build-action@v3.1.0
+        uses: esphome/build-action@v7
         with:
-          yaml_file: ${{ matrix.file }}
+          yaml-file: ${{ matrix.file }}
