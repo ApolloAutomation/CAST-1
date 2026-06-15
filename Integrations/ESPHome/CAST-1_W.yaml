@@ -1,0 +1,95 @@
+
+esphome:
+  name: "apollo-cast-1-w"
+  friendly_name: Apollo CAST-1
+  comment: Apollo CAST-1
+  name_add_mac_suffix: true
+  platformio_options:
+    board_build.flash_mode: dio
+
+  project:
+    name: "ApolloAutomation.CAST-1-W"
+    version: ${version}
+
+  min_version: 2026.5.0
+
+  on_boot:
+    - priority: 800
+      then:
+        - if:
+            condition:
+              - lambda: "return id(runTest);"
+            then:
+              - lambda: "id(testScript).execute();"
+  
+dashboard_import:
+  package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1_W.yaml
+  import_full_config: false
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+  - platform: http_request
+    id: ota_managed
+
+http_request:
+  verify_ssl: true
+
+safe_mode:
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+web_server:
+  port: 80
+
+update:
+  - platform: http_request
+    id: update_http_request
+    name: Firmware Update
+    source: https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json
+
+logger:
+
+wifi:
+  id: wifi_1
+  on_connect:
+    - delay: 5s
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+  ap:
+    ssid: "Apollo CAST 1 Hotspot"
+
+captive_portal:
+
+select:
+  - platform: template
+    id: firmware_selector
+    name: Firmware Type
+    icon: "mdi:test-tube"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "WiFi"
+      - "Ethernet"
+    initial_option: "WiFi"
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(firmware_selector).current_option() == "Ethernet";'
+            then:
+              - logger.log: "OTA updates set to use ethernet firmware"
+              - lambda: id(update_http_request).set_source_url("https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json");
+              - component.update: update_http_request
+            else:
+              - logger.log: "OTA updates set to use wifi firmware"
+              - lambda: id(update_http_request).set_source_url("https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json");
+              - component.update: update_http_request
+
+packages:
+  core: !include Core.yaml
