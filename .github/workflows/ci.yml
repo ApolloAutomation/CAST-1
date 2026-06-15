@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Building ${{ matrix.file }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        file: # TODO: Rename
+          - Integrations/ESPHome/PLT-1.yaml
+          - Integrations/ESPHome/PLT-1_BLE.yaml
+        esphome-version:
+          - stable
+          - beta
+          - dev
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4.1.7
+      - name: Build ESPHome firmware to verify configuration
+        uses: esphome/build-action@v3.1.0
+        with:
+          yaml_file: ${{ matrix.file }}
