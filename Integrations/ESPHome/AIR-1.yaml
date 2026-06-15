@@ -1,0 +1,53 @@
+esphome:
+  name: "${name}"
+  friendly_name: Apollo AIR-1 # TODO: Rename
+  comment: Apollo AIR-1 # TODO: Rename
+  name_add_mac_suffix: true
+  platformio_options:
+    board_build.flash_mode: dio
+
+  project:
+    name: "ApolloAutomation.AIR-1" # TODO: Rename
+    version: "${version}"
+
+  min_version: 2023.11.1
+
+dashboard_import:
+  package_import_url: github://ApolloAutomation/AIR-1/Integrations/ESPHome/AIR-1.yaml
+  import_full_config: false # TODO: Rename
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+  - platform: http_request
+    id: ota_managed
+
+http_request:
+  verify_ssl: true
+
+safe_mode:
+
+update:
+  - platform: http_request
+    id: firmware_update
+    name: Firmware Update
+    source: https://apolloautomation.github.io/PLT-1/artifact/manifest.json # TODO: Rename
+
+wifi:
+  on_connect:
+    - delay: 5s
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+  ap:
+    ssid: "Apollo PLT1 Hotspot" # TODO: Rename
+
+logger:
+
+packages:
+  core: !include Core.yaml

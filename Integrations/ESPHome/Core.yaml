@@ -1,0 +1,26 @@
+substitutions:
+  name: apollo-plt-1 # TODO: Rename
+  version: "24.8.7.2"
+  device_description: ${name} made by Apollo Automation - version ${version}.
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+api:
+
+globals:
+  - id: cycleCounter
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: button_press_timestamp
+    restore_value: no
+    type: uint32_t
+    initial_value: '0'
+
+captive_portal:
+
+web_server:
+  port: 80
