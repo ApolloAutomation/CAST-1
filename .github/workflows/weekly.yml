@@ -1,0 +1,26 @@
+name: Weekly Firmware Build
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  build:
+    name: Building ${{ matrix.file }} / ESPHome ${{ matrix.esphome-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        file:
+          - Integrations/ESPHome/CAST-1_ETH.yaml
+          - Integrations/ESPHome/CAST-1_W.yaml
+        esphome-version:
+          - stable
+          - beta
+          - dev
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6.0.3
+      - name: Build ESPHome firmware to verify configuration
+        uses: esphome/build-action@v7
+        with:
+          yaml-file: ${{ matrix.file }}
