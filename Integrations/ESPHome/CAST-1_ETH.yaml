@@ -68,7 +68,7 @@ select:
     options:
       - "WiFi"
       - "Ethernet"
-    initial_option: "WiFi"
+    initial_option: "Ethernet"
     on_value:
       then:
         - if:
