@@ -21,7 +21,12 @@ esphome:
               - lambda: "return id(runTest);"
             then:
               - lambda: "id(testScript).execute();"
-  
+    - priority: 500
+      then:
+        - text_sensor.template.publish:
+            id: apollo_firmware_version
+            state: "${version}"
+
 dashboard_import:
   package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1_ETH.yaml
   import_full_config: false
