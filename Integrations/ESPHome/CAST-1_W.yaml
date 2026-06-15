@@ -96,5 +96,12 @@ select:
               - lambda: id(update_http_request).set_source_url("https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json");
               - component.update: update_http_request
 
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      id: wifi_ip
+      entity_category: "diagnostic"
+
 packages:
   core: !include Core.yaml
