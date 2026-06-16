@@ -59,12 +59,9 @@ update:
 logger:
 
 wifi:
-  id: wifi_1
   on_connect:
-    - delay: 5s
-    - ble.disable:
-  on_disconnect:
-    - ble.enable:
+    - component.update: update_http_request
+  id: wifi_1
   ap:
     ssid: "Apollo CAST 1 Hotspot"
 
