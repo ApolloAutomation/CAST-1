@@ -312,9 +312,9 @@ media_player:
                 green: 100%
                 brightness: 50%
             - mixer_speaker.apply_ducking:
-                  id: media_mixer_input
-                  decibel_reduction: 40
-                  duration: 0.0s
+                id: media_mixer_input
+                decibel_reduction: 40
+                duration: 0.0s
             - wait_until:
                 media_player.is_announcing: external_media_player
             - delay: 0.75s
@@ -325,9 +325,9 @@ media_player:
                 - not:
                     media_player.is_announcing: external_media_player
             - mixer_speaker.apply_ducking:
-                      id: media_mixer_input
-                      decibel_reduction: 0
-                      duration: 1.0s
+                id: media_mixer_input
+                decibel_reduction: 0
+                duration: 1.0s
             - media_player.volume_set:
                 id: external_media_player
                 volume: !lambda "return id(current_volume);"
