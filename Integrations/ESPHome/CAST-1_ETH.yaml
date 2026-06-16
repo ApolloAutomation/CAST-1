@@ -44,6 +44,7 @@ safe_mode:
 
 web_server:
   port: 80
+  version: 3
 
 update:
   - platform: http_request
