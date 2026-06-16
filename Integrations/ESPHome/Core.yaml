@@ -61,11 +61,6 @@ i2c:
   scl: GPIO48
   id: bus_a
 
-external_components:
-  - source: github://sonocotta/esphome-pcm5122
-    components: [ pcm5122 ]
-    refresh: 24h
-
 button:
   - platform: restart
     icon: mdi:power-cycle
@@ -127,12 +122,12 @@ switch:
   - platform: factory_reset
     id: factory_reset_switch
     disabled_by_default: true
-  - platform: pcm5122
-    enable_dac:
-      name: Enable DAC
-      id: enable_dac
-      restore_mode: ALWAYS_ON
-    
+  - platform: gpio
+    pin: GPIO21
+    name: Enable DAC
+    id: enable_dac
+    restore_mode: ALWAYS_ON
+
 text_sensor:
   - platform: sendspin
     type: title
@@ -204,12 +199,9 @@ remote_receiver:
 audio_dac:
   - platform: pcm5122
     id: external_dac
+    i2c_id: bus_a
     address: 0x4D
-    enable_pin: GPIO21
-    volume_max: 0dB
-    volume_min: -60dB
-    analog_gain: -6dB
-    mixer_mode: STEREO
+    bits_per_sample: 16bit
 
 i2s_audio:
 - id: i2s_out
