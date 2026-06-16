@@ -322,17 +322,20 @@ media_player:
             - lambda: id(announcement_triggered) = false;
 
     on_state:
-      if:
-        condition:
-          and:
-            - lambda: return (!id(announcement_triggered));
-            - not:
-                media_player.is_announcing: external_media_player
-        then:
-          - mixer_speaker.apply_ducking:
-              id: media_mixer_input
-              decibel_reduction: 0
-              duration: 1.0s
+      # Core pcm5122 boots muted; nothing else unmutes the external DAC, so
+      # unmute it on every state change (idempotent).
+      - audio_dac.mute_off: external_dac
+      - if:
+          condition:
+            and:
+              - lambda: return (!id(announcement_triggered));
+              - not:
+                  media_player.is_announcing: external_media_player
+          then:
+            - mixer_speaker.apply_ducking:
+                id: media_mixer_input
+                decibel_reduction: 0
+                duration: 1.0s
 
 
 
