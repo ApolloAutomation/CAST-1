@@ -145,6 +145,17 @@ text_sensor:
     type: album
     name: Album
 
+  - platform: version
+    name: "ESPHome Version"
+    hide_timestamp: true
+    entity_category: "diagnostic"
+
+  - platform: template
+    name: "Apollo Firmware Version"
+    id: apollo_firmware_version
+    update_interval: never
+    entity_category: "diagnostic"
+
 light:
   - platform: esp32_rmt_led_strip
     id: rgb_light
