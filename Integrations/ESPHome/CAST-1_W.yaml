@@ -47,10 +47,6 @@ improv_serial:
 esp32_improv:
   authorizer: none
 
-web_server:
-  port: 80
-  version: 3
-
 update:
   - platform: http_request
     id: update_http_request
