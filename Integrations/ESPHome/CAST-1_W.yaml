@@ -59,6 +59,10 @@ wifi:
   on_connect:
     - component.update: update_http_request
   id: wifi_1
+  # Temporary workaround: post-connect roam scans briefly drop the Music
+  # Assistant stream mid-playback even on a strong signal. Remove this once
+  # esphome stops roaming from interrupting active playback.
+  post_connect_roaming: false
   ap:
     ssid: "Apollo CAST 1 Hotspot"
 
