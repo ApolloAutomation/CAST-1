@@ -21,7 +21,12 @@ esphome:
               - lambda: "return id(runTest);"
             then:
               - lambda: "id(testScript).execute();"
-  
+    - priority: 500
+      then:
+        - text_sensor.template.publish:
+            id: apollo_firmware_version
+            state: "${version}"
+
 dashboard_import:
   package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1_ETH.yaml
   import_full_config: false
@@ -37,9 +42,6 @@ http_request:
 
 safe_mode:
 
-web_server:
-  port: 80
-
 update:
   - platform: http_request
     id: update_http_request
@@ -52,10 +54,10 @@ ethernet:
   type: W5500
   clk_pin: GPIO41
   mosi_pin: GPIO40
-  miso_pin: GPIO35
+  miso_pin: GPIO38
   cs_pin: GPIO42
   interrupt_pin: GPIO2
-  reset_pin: GPIO36
+  reset_pin: GPIO39
 
 select:
   - platform: template
@@ -82,6 +84,13 @@ select:
               - logger.log: "OTA updates set to use wifi firmware"
               - lambda: id(update_http_request).set_source_url("https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json");
               - component.update: update_http_request
+
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: "IP Address"
+      id: eth_ip
+      entity_category: "diagnostic"
 
 packages:
   core: !include Core.yaml

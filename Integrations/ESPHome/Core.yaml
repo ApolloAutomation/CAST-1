@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.5.27.1"
+  version: "26.6.17.1"
 
 esp32:
   variant: ESP32S3
@@ -52,8 +52,9 @@ psram:
   mode: octal
   speed: 80MHz
 
-web_server:  
+web_server:
   port: 80
+  version: 3
 
 i2c:
   sda: GPIO47
@@ -145,6 +146,17 @@ text_sensor:
     type: album
     name: Album
 
+  - platform: version
+    name: "ESPHome Version"
+    hide_timestamp: true
+    entity_category: "diagnostic"
+
+  - platform: template
+    name: "Apollo Firmware Version"
+    id: apollo_firmware_version
+    update_interval: never
+    entity_category: "diagnostic"
+
 light:
   - platform: esp32_rmt_led_strip
     id: rgb_light
@@ -234,13 +246,6 @@ speaker:
     sample_rate: 48000
     bits_per_sample: 16
 
-  - platform: resampler
-    id: announcement_resampling_speaker
-    output_speaker: announcement_mixer_input
-    task_stack_in_psram: true
-    sample_rate: 48000
-    bits_per_sample: 16
-
 
 sendspin:
   id: sendspin_hub
@@ -301,9 +306,9 @@ media_player:
                 green: 100%
                 brightness: 50%
             - mixer_speaker.apply_ducking:
-                  id: media_mixer_input
-                  decibel_reduction: 40
-                  duration: 0.0s
+                id: media_mixer_input
+                decibel_reduction: 40
+                duration: 0.0s
             - wait_until:
                 media_player.is_announcing: external_media_player
             - delay: 0.75s
@@ -314,9 +319,9 @@ media_player:
                 - not:
                     media_player.is_announcing: external_media_player
             - mixer_speaker.apply_ducking:
-                      id: media_mixer_input
-                      decibel_reduction: 0
-                      duration: 1.0s
+                id: media_mixer_input
+                decibel_reduction: 0
+                duration: 1.0s
             - media_player.volume_set:
                 id: external_media_player
                 volume: !lambda "return id(current_volume);"
