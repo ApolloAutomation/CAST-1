@@ -12,8 +12,9 @@ on:
       - 'Integrations/ESPHome/**'
   workflow_dispatch:
 
+# Least privilege: read-only by default; only publish-beta is elevated to write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   version:
@@ -22,7 +23,7 @@ jobs:
     outputs:
       v: ${{ steps.read.outputs.v }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - id: read
         run: |
           v=$(awk '/substitutions:/ {f=1} f && /version:/ {print $2; exit}' \
@@ -38,7 +39,7 @@ jobs:
         include:
           - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
           - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
-    uses: esphome/workflows/.github/workflows/build.yml@2025.10.0
+    uses: esphome/workflows/.github/workflows/build.yml@e7eee2a828517c042794a831f75310959fbf2a16 # 2025.10.0
     with:
       files: ${{ matrix.yaml }}
       esphome-version: stable
@@ -53,7 +54,7 @@ jobs:
       contents: write
     steps:
       - name: Download firmware artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           path: fw
           pattern: firmware*
@@ -83,7 +84,7 @@ jobs:
             # device never has to resolve a relative path against a redirected URL.
             jq --arg base "$BASE" '
               .builds[0].ota.path = ($base + "/" + (.builds[0].ota.path | sub(".*/"; "")))
-              | .builds[0].parts[0].path = ($base + "/" + (.builds[0].parts[0].path | sub(".*/"; "")))
+              | .builds[0].parts |= map(.path = ($base + "/" + (.path | sub(".*/"; ""))))
             ' "$man" > "manifest-$v.json"
             cat "manifest-$v.json"
             gh release upload beta "manifest-$v.json" -R "${{ github.repository }}" --clobber
