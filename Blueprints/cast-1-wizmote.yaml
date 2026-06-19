@@ -16,11 +16,18 @@ blueprint:
   source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Blueprints/cast-1-wizmote.yaml
   input:
     cast1_device:
-      name: CAST-1 device
-      description: The CAST-1 whose WizMote buttons this controls.
+      name: Apollo CAST-1
+      description: Select your CAST-1 from the dropdown!
       selector:
         device:
-          integration: esphome
+          filter:
+            - integration: esphome
+              manufacturer: ApolloAutomation
+              model: CAST-1-W
+            - integration: esphome
+              manufacturer: ApolloAutomation
+              model: CAST-1-ETH
+          multiple: false
     button_on:
       name: "On button"
       icon: mdi:gesture-tap-button
