@@ -188,6 +188,22 @@ number:
     initial_value: 50
     optimistic: true
 
+select:
+  - platform: template
+    id: firmware_channel
+    name: "Firmware Channel"
+    icon: "mdi:source-branch"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "Main"
+      - "Beta"
+    initial_option: "Main"
+    on_value:
+      then:
+        - script.execute: apply_ota_source
+
 remote_receiver:
   pin: 
     number: GPIO07
@@ -342,6 +358,25 @@ media_player:
 
 
 script:
+  - id: apply_ota_source
+    # Sets the OTA source URL from the two selectors: Firmware Type (WiFi/Ethernet)
+    # x Firmware Channel (Main/Beta). Main = GitHub Pages, Beta = GitHub release assets.
+    then:
+      - lambda: |-
+          const bool eth  = id(firmware_selector).state == "Ethernet";
+          const bool beta = id(firmware_channel).state == "Beta";
+          std::string url;
+          if (beta) {
+            url = eth
+              ? "https://github.com/ApolloAutomation/CAST-1/releases/download/beta/manifest-e.json"
+              : "https://github.com/ApolloAutomation/CAST-1/releases/download/beta/manifest-w.json";
+          } else {
+            url = eth
+              ? "https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json"
+              : "https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json";
+          }
+          id(update_http_request).set_source_url(url);
+      - component.update: update_http_request
   - id: statusCheck
     then:
       - if:
