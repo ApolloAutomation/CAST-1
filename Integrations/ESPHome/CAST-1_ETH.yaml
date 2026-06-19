@@ -92,5 +92,31 @@ text_sensor:
       id: eth_ip
       entity_category: "diagnostic"
 
+# ESP-NOW has no WiFi to follow on the Ethernet variant, so it needs a
+# starting channel. The interval below scans channels until the WizMote is
+# heard, then holds. (The espnow handlers/entities live in Core.yaml.)
+espnow:
+  channel: 1
+
+interval:
+  - interval: 2s
+    then:
+      - if:
+          condition:
+            lambda: |-
+              std::string mac = id(wizmote_mac_address).state;
+              bool want = id(wizmote_discovery_mode).state ||
+                          (mac != "00:00:00:00:00:00" && mac != "");
+              return want && (millis() - id(wizmote_last_packet_ms) > 30000);
+          then:
+            - lambda: |-
+                id(wizmote_scan_channel)++;
+                if (id(wizmote_scan_channel) > 13) id(wizmote_scan_channel) = 1;
+            - espnow.set_channel:
+                channel: !lambda 'return id(wizmote_scan_channel);'
+            - logger.log:
+                format: "WizMote channel scan: trying channel %d"
+                args: ['id(wizmote_scan_channel)']
+
 packages:
   core: !include Core.yaml
