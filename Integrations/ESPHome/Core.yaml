@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.6.17.1"
+  version: "26.6.18.1"
 
 esp32:
   variant: ESP32S3
@@ -60,11 +60,6 @@ i2c:
   sda: GPIO47
   scl: GPIO48
   id: bus_a
-
-external_components:
-  - source: github://sonocotta/esphome-pcm5122
-    components: [ pcm5122 ]
-    refresh: 24h
 
 button:
   - platform: restart
@@ -127,12 +122,12 @@ switch:
   - platform: factory_reset
     id: factory_reset_switch
     disabled_by_default: true
-  - platform: pcm5122
-    enable_dac:
-      name: Enable DAC
-      id: enable_dac
-      restore_mode: ALWAYS_ON
-    
+  - platform: gpio
+    pin: GPIO21
+    name: Enable DAC
+    id: enable_dac
+    restore_mode: ALWAYS_ON
+
 text_sensor:
   - platform: sendspin
     type: title
@@ -204,12 +199,9 @@ remote_receiver:
 audio_dac:
   - platform: pcm5122
     id: external_dac
+    i2c_id: bus_a
     address: 0x4D
-    enable_pin: GPIO21
-    volume_max: 0dB
-    volume_min: -60dB
-    analog_gain: -6dB
-    mixer_mode: STEREO
+    bits_per_sample: 16bit
 
 i2s_audio:
 - id: i2s_out
@@ -330,17 +322,20 @@ media_player:
             - lambda: id(announcement_triggered) = false;
 
     on_state:
-      if:
-        condition:
-          and:
-            - lambda: return (!id(announcement_triggered));
-            - not:
-                media_player.is_announcing: external_media_player
-        then:
-          - mixer_speaker.apply_ducking:
-              id: media_mixer_input
-              decibel_reduction: 0
-              duration: 1.0s
+      # Core pcm5122 boots muted; nothing else unmutes the external DAC, so
+      # unmute it on every state change (idempotent).
+      - audio_dac.mute_off: external_dac
+      - if:
+          condition:
+            and:
+              - lambda: return (!id(announcement_triggered));
+              - not:
+                  media_player.is_announcing: external_media_player
+          then:
+            - mixer_speaker.apply_ducking:
+                id: media_mixer_input
+                decibel_reduction: 0
+                duration: 1.0s
 
 
 
