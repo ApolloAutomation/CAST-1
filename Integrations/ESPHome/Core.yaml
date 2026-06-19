@@ -498,30 +498,45 @@ script:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_ON};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "ON -> play"
             - media_player.play: sendspin_group_media_player
       # OFF -> pause
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_OFF};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "OFF -> pause"
             - media_player.pause: sendspin_group_media_player
       # Scene 1 -> previous track
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_1};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 1 -> previous track"
             - media_player.previous: sendspin_group_media_player
       # Scene 2 -> next track
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_2};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 2 -> next track"
             - media_player.next: sendspin_group_media_player
       # Scene 3 -> fire HA event (map to a playlist/favorite in Home Assistant)
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_3};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 3 -> HA event esphome.cast1_wizmote_scene_3"
             - homeassistant.event:
                 event: esphome.cast1_wizmote_scene_3
       # Scene 4 -> fire HA event (map to a playlist/favorite in Home Assistant)
@@ -529,6 +544,9 @@ script:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_4};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 4 -> HA event esphome.cast1_wizmote_scene_4"
             - homeassistant.event:
                 event: esphome.cast1_wizmote_scene_4
       # Bright + -> volume up (this speaker)
@@ -537,18 +555,44 @@ script:
             lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_UP};'
           then:
             - media_player.volume_up: external_media_player
+            - logger.log:
+                tag: wizmote
+                format: "Bright+ -> volume up (now %.0f%%)"
+                args: ['id(external_media_player).volume * 100.0f']
       # Bright - -> volume down (this speaker)
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_DOWN};'
           then:
             - media_player.volume_down: external_media_player
+            - logger.log:
+                tag: wizmote
+                format: "Bright- -> volume down (now %.0f%%)"
+                args: ['id(external_media_player).volume * 100.0f']
       # Night -> toggle the RGB light
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_NIGHT};'
           then:
+            - logger.log:
+                tag: wizmote
+                format: "Night -> toggle RGB light"
             - light.toggle: rgb_light
+      # Anything else: log it so unmapped buttons are visible
+      - if:
+          condition:
+            lambda: |-
+              return button != ${WIZMOTE_BUTTON_ON} && button != ${WIZMOTE_BUTTON_OFF} &&
+                     button != ${WIZMOTE_BUTTON_NIGHT} && button != ${WIZMOTE_BUTTON_BRIGHT_UP} &&
+                     button != ${WIZMOTE_BUTTON_BRIGHT_DOWN} && button != ${WIZMOTE_BUTTON_1} &&
+                     button != ${WIZMOTE_BUTTON_2} && button != ${WIZMOTE_BUTTON_3} &&
+                     button != ${WIZMOTE_BUTTON_4};
+          then:
+            - logger.log:
+                tag: wizmote
+                level: WARN
+                format: "unmapped button %d"
+                args: ['button']
 
 # ---------------------------------------------------------------------------
 # WizMote remote (ESP-NOW). The espnow: block carries no channel here so it
