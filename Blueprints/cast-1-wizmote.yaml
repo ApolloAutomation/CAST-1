@@ -1,116 +1,281 @@
 blueprint:
   name: Apollo CAST-1 WizMote
   description: >
-    Run Home Assistant actions from an Apollo CAST-1 WizMote.
+    Configure all nine Apollo CAST-1 WizMote buttons from one place.
 
-    On the CAST-1, set any button's dropdown to "Send HA Event" (Button 3 and 4
-    ship that way). Then choose what each button does here. Buttons left on a
-    built-in action (Play, Volume, etc.) are handled on the device and never
-    reach this automation.
+    For each button pick an Action. The media actions (Play, Volume, Next,
+    etc.) run on the CAST-1 itself and keep working even if Home Assistant is
+    offline. Pick "Send HA Event" to run your own Home Assistant action
+    instead, then fill in the action below it.
+
+    This blueprint writes your picks down to the CAST-1 when Home Assistant
+    starts and whenever you save it, so you never need to open the device
+    page - the blueprint is the source of truth for the buttons. Choose your
+    CAST-1 below.
   domain: automation
   source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Blueprints/cast-1-wizmote.yaml
   input:
-    on_action:
-      name: "On"
-      default: []
+    cast1_device:
+      name: CAST-1 device
+      description: The CAST-1 whose WizMote buttons this controls.
       selector:
-        action:
-    off_action:
-      name: "Off"
-      default: []
-      selector:
-        action:
-    night_action:
-      name: "Night"
-      default: []
-      selector:
-        action:
-    bright_up_action:
-      name: "Brightness Up"
-      default: []
-      selector:
-        action:
-    bright_down_action:
-      name: "Brightness Down"
-      default: []
-      selector:
-        action:
-    button_1_action:
+        device:
+          integration: esphome
+    button_on:
+      name: "On button"
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        on_mode:
+          name: Action
+          default: "Play"
+          selector:
+            select:
+              mode: dropdown
+              options: &actions
+                - "Nothing"
+                - "Play"
+                - "Pause"
+                - "Play / Pause"
+                - "Next Track"
+                - "Previous Track"
+                - "Volume Up"
+                - "Volume Down"
+                - "Toggle Light"
+                - "Send HA Event"
+        on_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_off:
+      name: "Off button"
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        off_mode:
+          name: Action
+          default: "Pause"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        off_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_night:
+      name: "Night button"
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        night_mode:
+          name: Action
+          default: "Toggle Light"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        night_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_bright_up:
+      name: "Brightness Up button"
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        bright_up_mode:
+          name: Action
+          default: "Volume Up"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        bright_up_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_bright_down:
+      name: "Brightness Down button"
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        bright_down_mode:
+          name: Action
+          default: "Volume Down"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        bright_down_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_1:
       name: "Button 1"
-      default: []
-      selector:
-        action:
-    button_2_action:
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        button_1_mode:
+          name: Action
+          default: "Previous Track"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        button_1_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_2:
       name: "Button 2"
-      default: []
-      selector:
-        action:
-    button_3_action:
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        button_2_mode:
+          name: Action
+          default: "Next Track"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        button_2_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_3:
       name: "Button 3"
-      default: []
-      selector:
-        action:
-    button_4_action:
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        button_3_mode:
+          name: Action
+          default: "Send HA Event"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        button_3_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
+    button_4:
       name: "Button 4"
-      default: []
-      selector:
-        action:
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        button_4_mode:
+          name: Action
+          default: "Send HA Event"
+          selector:
+            select:
+              mode: dropdown
+              options: *actions
+        button_4_action:
+          name: Custom action
+          description: Run when Action is set to "Send HA Event".
+          default: []
+          selector:
+            action:
 
 mode: queued
 max: 10
 
-# One event trigger per button, matched natively on the event's button value
-# (no templates, so HA's numeric coercion can't break the match). The button
-# values are quoted so "on"/"off" aren't read as YAML booleans.
+variables:
+  cast1_device: !input cast1_device
+
+# Two jobs:
+#  - on HA start / save (id: sync) push each button's chosen Action down to the
+#    matching WizMote select on the device, so the device page mirrors this UI.
+#  - on a button event (the device only emits one when its Action is "Send HA
+#    Event") run that button's custom action.
 triggers:
+  - trigger: homeassistant
+    event: start
+    id: sync
+  - trigger: event
+    event_type: automation_reloaded
+    id: sync
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "on"
+    event_data: { button: "on" }
     id: "on"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "off"
+    event_data: { button: "off" }
     id: "off"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "night"
+    event_data: { button: "night" }
     id: "night"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "brightness_up"
+    event_data: { button: "brightness_up" }
     id: "brightness_up"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "brightness_down"
+    event_data: { button: "brightness_down" }
     id: "brightness_down"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "1"
+    event_data: { button: "1" }
     id: "button_1"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "2"
+    event_data: { button: "2" }
     id: "button_2"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "3"
+    event_data: { button: "3" }
     id: "button_3"
   - trigger: event
     event_type: esphome.cast1_wizmote_event
-    event_data:
-      button: "4"
+    event_data: { button: "4" }
     id: "button_4"
 
 actions:
   - choose:
+      - conditions:
+          - condition: trigger
+            id: sync
+        sequence:
+          - repeat:
+              for_each:
+                - { suffix: "wizmote_on", option: !input on_mode }
+                - { suffix: "wizmote_off", option: !input off_mode }
+                - { suffix: "wizmote_night", option: !input night_mode }
+                - { suffix: "wizmote_brightness_up", option: !input bright_up_mode }
+                - { suffix: "wizmote_brightness_down", option: !input bright_down_mode }
+                - { suffix: "wizmote_button_1", option: !input button_1_mode }
+                - { suffix: "wizmote_button_2", option: !input button_2_mode }
+                - { suffix: "wizmote_button_3", option: !input button_3_mode }
+                - { suffix: "wizmote_button_4", option: !input button_4_mode }
+              sequence:
+                - action: select.select_option
+                  continue_on_error: true
+                  target:
+                    entity_id: >-
+                      {{ device_entities(cast1_device)
+                         | select('search', '_' ~ repeat.item.suffix ~ '$')
+                         | list | first }}
+                  data:
+                    option: "{{ repeat.item.option }}"
       - conditions:
           - condition: trigger
             id: "on"
