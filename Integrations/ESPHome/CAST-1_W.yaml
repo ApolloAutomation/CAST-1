@@ -11,7 +11,7 @@ esphome:
     name: "ApolloAutomation.CAST-1-W"
     version: ${version}
 
-  min_version: 2026.5.0
+  min_version: 2026.6.0
 
   on_boot:
     - priority: 800
@@ -39,6 +39,11 @@ ota:
 
 http_request:
   verify_ssl: true
+  # Beta OTA manifests/binaries are GitHub release assets, which 302-redirect to
+  # long signed CDN URLs (~900+ bytes). The default 512-byte RX buffer overflows
+  # ("Out of buffer"), so enlarge it. See esphome/esphome#13786.
+  buffer_size_rx: 4096
+  buffer_size_tx: 1024
 
 safe_mode:
 
@@ -82,17 +87,7 @@ select:
     initial_option: "WiFi"
     on_value:
       then:
-        - if:
-            condition:
-              lambda: 'return id(firmware_selector).current_option() == "Ethernet";'
-            then:
-              - logger.log: "OTA updates set to use ethernet firmware"
-              - lambda: id(update_http_request).set_source_url("https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json");
-              - component.update: update_http_request
-            else:
-              - logger.log: "OTA updates set to use wifi firmware"
-              - lambda: id(update_http_request).set_source_url("https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json");
-              - component.update: update_http_request
+        - script.execute: apply_ota_source
 
 text_sensor:
   - platform: wifi_info
