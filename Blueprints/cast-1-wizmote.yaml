@@ -35,6 +35,7 @@ blueprint:
       input:
         on_mode:
           name: Action
+          description: "Default: Play"
           default: "Play"
           selector:
             select:
@@ -63,6 +64,7 @@ blueprint:
       input:
         off_mode:
           name: Action
+          description: "Default: Pause"
           default: "Pause"
           selector:
             select:
@@ -81,6 +83,7 @@ blueprint:
       input:
         night_mode:
           name: Action
+          description: "Default: Toggle Light"
           default: "Toggle Light"
           selector:
             select:
@@ -99,6 +102,7 @@ blueprint:
       input:
         bright_up_mode:
           name: Action
+          description: "Default: Volume Up"
           default: "Volume Up"
           selector:
             select:
@@ -117,6 +121,7 @@ blueprint:
       input:
         bright_down_mode:
           name: Action
+          description: "Default: Volume Down"
           default: "Volume Down"
           selector:
             select:
@@ -135,6 +140,7 @@ blueprint:
       input:
         button_1_mode:
           name: Action
+          description: "Default: Previous Track"
           default: "Previous Track"
           selector:
             select:
@@ -153,6 +159,7 @@ blueprint:
       input:
         button_2_mode:
           name: Action
+          description: "Default: Next Track"
           default: "Next Track"
           selector:
             select:
@@ -171,6 +178,7 @@ blueprint:
       input:
         button_3_mode:
           name: Action
+          description: "Default: Send HA Event"
           default: "Send HA Event"
           selector:
             select:
@@ -189,6 +197,7 @@ blueprint:
       input:
         button_4_mode:
           name: Action
+          description: "Default: Send HA Event"
           default: "Send HA Event"
           selector:
             select:
