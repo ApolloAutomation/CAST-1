@@ -59,34 +59,91 @@ blueprint:
 mode: queued
 max: 10
 
-trigger:
-  - platform: event
+# One event trigger per button, matched natively on the event's button value
+# (no templates, so HA's numeric coercion can't break the match). The button
+# values are quoted so "on"/"off" aren't read as YAML booleans.
+triggers:
+  - trigger: event
     event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "on"
+    id: "on"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "off"
+    id: "off"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "night"
+    id: "night"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "brightness_up"
+    id: "brightness_up"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "brightness_down"
+    id: "brightness_down"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "1"
+    id: "button_1"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "2"
+    id: "button_2"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "3"
+    id: "button_3"
+  - trigger: event
+    event_type: esphome.cast1_wizmote_event
+    event_data:
+      button: "4"
+    id: "button_4"
 
-variables:
-  # HA's template engine coerces numeric-looking values to numbers, so the
-  # event's button "3" arrives here as the int 3. The | string in each
-  # condition below forces the comparison back to text at evaluation time
-  # (a | string in this variable would just get re-coerced and lost).
-  pressed: "{{ trigger.event.data.button }}"
-
-action:
+actions:
   - choose:
-      - conditions: "{{ pressed | string == 'on' }}"
+      - conditions:
+          - condition: trigger
+            id: "on"
         sequence: !input on_action
-      - conditions: "{{ pressed | string == 'off' }}"
+      - conditions:
+          - condition: trigger
+            id: "off"
         sequence: !input off_action
-      - conditions: "{{ pressed | string == 'night' }}"
+      - conditions:
+          - condition: trigger
+            id: "night"
         sequence: !input night_action
-      - conditions: "{{ pressed | string == 'brightness_up' }}"
+      - conditions:
+          - condition: trigger
+            id: "brightness_up"
         sequence: !input bright_up_action
-      - conditions: "{{ pressed | string == 'brightness_down' }}"
+      - conditions:
+          - condition: trigger
+            id: "brightness_down"
         sequence: !input bright_down_action
-      - conditions: "{{ pressed | string == '1' }}"
+      - conditions:
+          - condition: trigger
+            id: "button_1"
         sequence: !input button_1_action
-      - conditions: "{{ pressed | string == '2' }}"
+      - conditions:
+          - condition: trigger
+            id: "button_2"
         sequence: !input button_2_action
-      - conditions: "{{ pressed | string == '3' }}"
+      - conditions:
+          - condition: trigger
+            id: "button_3"
         sequence: !input button_3_action
-      - conditions: "{{ pressed | string == '4' }}"
+      - conditions:
+          - condition: trigger
+            id: "button_4"
         sequence: !input button_4_action
