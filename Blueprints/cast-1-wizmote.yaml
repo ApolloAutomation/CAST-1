@@ -64,7 +64,9 @@ trigger:
     event_type: esphome.cast1_wizmote_event
 
 variables:
-  pressed: "{{ trigger.event.data.button }}"
+  # ESPHome can deliver the button as a number; coerce so the string
+  # comparisons below ('on', '3', etc.) match.
+  pressed: "{{ trigger.event.data.button | string }}"
 
 action:
   - choose:
