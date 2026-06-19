@@ -1,0 +1,88 @@
+blueprint:
+  name: Apollo CAST-1 WizMote
+  description: >
+    Run Home Assistant actions from an Apollo CAST-1 WizMote.
+
+    On the CAST-1, set any button's dropdown to "Send HA Event" (Button 3 and 4
+    ship that way). Then choose what each button does here. Buttons left on a
+    built-in action (Play, Volume, etc.) are handled on the device and never
+    reach this automation.
+  domain: automation
+  source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Integrations/HomeAssistant/cast-1-wizmote.yaml
+  input:
+    on_action:
+      name: On
+      default: []
+      selector:
+        action:
+    off_action:
+      name: Off
+      default: []
+      selector:
+        action:
+    night_action:
+      name: Night
+      default: []
+      selector:
+        action:
+    bright_up_action:
+      name: Brightness Up
+      default: []
+      selector:
+        action:
+    bright_down_action:
+      name: Brightness Down
+      default: []
+      selector:
+        action:
+    button_1_action:
+      name: Button 1
+      default: []
+      selector:
+        action:
+    button_2_action:
+      name: Button 2
+      default: []
+      selector:
+        action:
+    button_3_action:
+      name: Button 3
+      default: []
+      selector:
+        action:
+    button_4_action:
+      name: Button 4
+      default: []
+      selector:
+        action:
+
+mode: queued
+max: 10
+
+trigger:
+  - platform: event
+    event_type: esphome.cast1_wizmote_event
+
+variables:
+  pressed: "{{ trigger.event.data.button }}"
+
+action:
+  - choose:
+      - conditions: "{{ pressed == 'on' }}"
+        sequence: !input on_action
+      - conditions: "{{ pressed == 'off' }}"
+        sequence: !input off_action
+      - conditions: "{{ pressed == 'night' }}"
+        sequence: !input night_action
+      - conditions: "{{ pressed == 'brightness_up' }}"
+        sequence: !input bright_up_action
+      - conditions: "{{ pressed == 'brightness_down' }}"
+        sequence: !input bright_down_action
+      - conditions: "{{ pressed == '1' }}"
+        sequence: !input button_1_action
+      - conditions: "{{ pressed == '2' }}"
+        sequence: !input button_2_action
+      - conditions: "{{ pressed == '3' }}"
+        sequence: !input button_3_action
+      - conditions: "{{ pressed == '4' }}"
+        sequence: !input button_4_action
