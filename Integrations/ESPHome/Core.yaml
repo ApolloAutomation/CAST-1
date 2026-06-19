@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.6.18.2"
+  version: "26.6.19.1"
 
   # WizMote button codes (ESP-NOW)
   WIZMOTE_BUTTON_ON: "1"
