@@ -5,9 +5,9 @@ blueprint:
 
     **Features**
 
-    - 🎵 Every button ships with a sensible CAST-1 media action (Play, Pause, Volume, Next, Previous)
-    - 🔁 Override any of them right here, no device page needed; defaults shown under each
-    - 🏠 Or set a button to "Send HA Event" to trigger Home Assistant instead
+    - 🎵 Every button ships with a default (Play, Pause, Volume, Next, Previous) but you're able to override any of them to suit your needs
+    - 🔁 Override any button you want - select another option from the dropdown.
+    - 🏠 Or set a button to "Send HA Event" to set up a custom action instead!
 
     What's "Send HA Event"? It passes the press to Home Assistant so it can do anything HA can, for example:
 
