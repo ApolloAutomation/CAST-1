@@ -1,19 +1,17 @@
 blueprint:
   name: Apollo CAST-1 WizMote
-  description: >
-    Configure all nine Apollo CAST-1 WizMote buttons from one place.
+  description: |
+    🎛️ **WizMote buttons, all in one place.**
 
-    For each button pick an Action. The media actions (Play, Volume, Next,
-    etc.) run on the CAST-1 itself and keep working even if Home Assistant is
-    offline. Pick "Send HA Event" to run your own Home Assistant action
-    instead, then fill in the action below it.
+    ▶️ On-device - Play, Volume, Next... work even if HA is offline.
 
-    This blueprint writes your picks down to the CAST-1 when Home Assistant
-    starts and whenever you save it, so you never need to open the device
-    page - the blueprint is the source of truth for the buttons. Choose your
-    CAST-1 below.
+    🏠 Send HA Event - runs that button's Custom action.
+
+    💾 Auto-applied to your CAST-1 on start and save.
+
+    👇 Pick your CAST-1 to begin.
   domain: automation
-  source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Blueprints/cast-1-wizmote.yaml
+  source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Blueprints/CAST-1-WizMote.yaml
   input:
     cast1_device:
       name: Apollo CAST-1
