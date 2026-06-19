@@ -1,0 +1,332 @@
+# ---------------------------------------------------------------------------
+# WizMote remote control (ESP-NOW). Included by Core.yaml.
+#
+# Pair a WizMote with the Auto-Discovery switch, then control playback:
+#   ON/OFF -> play/pause, Scene 1/2 -> previous/next, Scene 3/4 -> HA events
+#   (esphome.cast1_wizmote_scene_3 / _4), Bright +/- -> volume, Night -> RGB light.
+#
+# The espnow: block carries no channel here so it follows the WiFi channel on
+# CAST-1_W. CAST-1_ETH (no WiFi) adds a starting channel + a scan interval.
+# ---------------------------------------------------------------------------
+
+substitutions:
+  # WizMote button codes (ESP-NOW)
+  WIZMOTE_BUTTON_ON: "1"
+  WIZMOTE_BUTTON_OFF: "2"
+  WIZMOTE_BUTTON_NIGHT: "3"
+  WIZMOTE_BUTTON_BRIGHT_UP: "9"
+  WIZMOTE_BUTTON_BRIGHT_DOWN: "8"
+  WIZMOTE_BUTTON_1: "16"
+  WIZMOTE_BUTTON_2: "17"
+  WIZMOTE_BUTTON_3: "18"
+  WIZMOTE_BUTTON_4: "19"
+  WIZMOTE_MAC_ADDRESS: "00:00:00:00:00:00"
+
+globals:
+  - id: wizmote_last_sequence
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: wizmote_previous_mac
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: wizmote_last_packet_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: wizmote_scan_channel
+    type: uint8_t
+    restore_value: no
+    initial_value: '1'
+
+button:
+  - platform: template
+    name: "Clear WizMote Pairing"
+    id: wizmote_clear_button
+    icon: "mdi:close-circle"
+    entity_category: config
+    on_press:
+      - lambda: |-
+          std::string mac = id(wizmote_mac_address).state;
+          if (mac != "00:00:00:00:00:00" && mac != "" && mac.length() == 17) {
+            std::array<uint8_t, 6> mac_bytes;
+            int parsed = sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                               &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                               &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+            if (parsed == 6) {
+              id(espnow_component).del_peer(mac_bytes.data());
+            }
+          }
+          id(wizmote_mac_address).publish_state("00:00:00:00:00:00");
+      - lambda: 'id(wizmote_status).update();'
+
+switch:
+  - platform: template
+    name: "WizMote Auto-Discovery"
+    id: wizmote_discovery_mode
+    icon: "mdi:radar"
+    entity_category: config
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - lambda: 'id(wizmote_status).update();'
+    on_turn_off:
+      - lambda: 'id(wizmote_status).update();'
+
+text_sensor:
+  - platform: template
+    name: "WizMote Status"
+    id: wizmote_status
+    icon: "mdi:information"
+    entity_category: diagnostic
+    update_interval: 300s
+    lambda: |-
+      std::string mac = id(wizmote_mac_address).state;
+      bool discovery = id(wizmote_discovery_mode).state;
+      if (discovery) {
+        return std::string("Discovery mode active");
+      } else if (mac == "00:00:00:00:00:00" || mac == "") {
+        return std::string("No WizMote paired");
+      } else {
+        return std::string("Paired: " + mac);
+      }
+
+text:
+  - platform: template
+    name: "WizMote MAC Address"
+    id: wizmote_mac_address
+    icon: "mdi:remote"
+    entity_category: config
+    initial_value: "${WIZMOTE_MAC_ADDRESS}"
+    optimistic: true
+    restore_value: true
+    mode: text
+    min_length: 17
+    max_length: 17
+    on_value:
+      - lambda: |-
+          std::string mac = x;
+          bool valid = true;
+          for (int i = 0; i < 17; i++) {
+            if (i % 3 == 2) { if (mac[i] != ':') { valid = false; break; } }
+            else { if (!std::isxdigit(mac[i])) { valid = false; break; } }
+          }
+          if (!valid) {
+            ESP_LOGW("wizmote", "Invalid MAC: %s", mac.c_str());
+            return;
+          }
+      - if:
+          condition:
+            lambda: 'return (id(wizmote_previous_mac) != "" && id(wizmote_previous_mac) != "00:00:00:00:00:00");'
+          then:
+            - espnow.peer.delete:
+                address: !lambda |-
+                  std::string mac = id(wizmote_previous_mac);
+                  std::array<uint8_t, 6> mac_bytes;
+                  sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                         &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                         &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+                  return mac_bytes;
+      - if:
+          condition:
+            lambda: 'return (x != "00:00:00:00:00:00" && x != "");'
+          then:
+            - espnow.peer.add:
+                address: !lambda |-
+                  std::string mac = x;
+                  std::array<uint8_t, 6> mac_bytes;
+                  sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                         &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                         &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+                  return mac_bytes;
+      - lambda: 'id(wizmote_previous_mac) = x;'
+      - lambda: 'id(wizmote_status).update();'
+
+script:
+  # WizMote button -> action mapping
+  - id: process_wizmote_button
+    parameters:
+      button: int
+    then:
+      # ON -> play / resume
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_ON};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "ON -> play"
+            - media_player.play: sendspin_group_media_player
+      # OFF -> pause
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_OFF};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "OFF -> pause"
+            - media_player.pause: sendspin_group_media_player
+      # Scene 1 -> previous track
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_1};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 1 -> previous track"
+            - media_player.previous: sendspin_group_media_player
+      # Scene 2 -> next track
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_2};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 2 -> next track"
+            - media_player.next: sendspin_group_media_player
+      # Scene 3 -> fire HA event (map to a playlist/favorite in Home Assistant)
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_3};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 3 -> HA event esphome.cast1_wizmote_scene_3"
+            - homeassistant.event:
+                event: esphome.cast1_wizmote_scene_3
+      # Scene 4 -> fire HA event (map to a playlist/favorite in Home Assistant)
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_4};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "Scene 4 -> HA event esphome.cast1_wizmote_scene_4"
+            - homeassistant.event:
+                event: esphome.cast1_wizmote_scene_4
+      # Bright + -> volume up (this speaker)
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_UP};'
+          then:
+            - media_player.volume_up: external_media_player
+            - logger.log:
+                tag: wizmote
+                format: "Bright+ -> volume up (now %.0f%%)"
+                args: ['id(external_media_player).volume * 100.0f']
+      # Bright - -> volume down (this speaker)
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_DOWN};'
+          then:
+            - media_player.volume_down: external_media_player
+            - logger.log:
+                tag: wizmote
+                format: "Bright- -> volume down (now %.0f%%)"
+                args: ['id(external_media_player).volume * 100.0f']
+      # Night -> toggle the RGB light
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_NIGHT};'
+          then:
+            - logger.log:
+                tag: wizmote
+                format: "Night -> toggle RGB light"
+            - light.toggle: rgb_light
+      # Anything else: log it so unmapped buttons are visible
+      - if:
+          condition:
+            lambda: |-
+              return button != ${WIZMOTE_BUTTON_ON} && button != ${WIZMOTE_BUTTON_OFF} &&
+                     button != ${WIZMOTE_BUTTON_NIGHT} && button != ${WIZMOTE_BUTTON_BRIGHT_UP} &&
+                     button != ${WIZMOTE_BUTTON_BRIGHT_DOWN} && button != ${WIZMOTE_BUTTON_1} &&
+                     button != ${WIZMOTE_BUTTON_2} && button != ${WIZMOTE_BUTTON_3} &&
+                     button != ${WIZMOTE_BUTTON_4};
+          then:
+            - logger.log:
+                tag: wizmote
+                level: WARN
+                format: "unmapped button %d"
+                args: ['button']
+
+espnow:
+  id: espnow_component
+  auto_add_peer: false
+  enable_on_boot: true
+  on_unknown_peer:
+    then:
+      - lambda: |-
+          char mac_str[18];
+          snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                   info.src_addr[0], info.src_addr[1], info.src_addr[2],
+                   info.src_addr[3], info.src_addr[4], info.src_addr[5]);
+          std::string sender_mac(mac_str);
+
+          if (size != 13) return;
+
+          uint8_t button = data[12];
+          bool discovery_mode = id(wizmote_discovery_mode).state;
+
+          if (discovery_mode) {
+            ESP_LOGI("wizmote", "Discovery: WizMote MAC: %s, Button: %d", sender_mac.c_str(), button);
+            std::string current_mac = id(wizmote_mac_address).state;
+            if (current_mac == "00:00:00:00:00:00" || current_mac == "" || current_mac != sender_mac) {
+              auto call = id(wizmote_mac_address).make_call();
+              call.set_value(sender_mac);
+              call.perform();
+              id(wizmote_discovery_mode).turn_off();
+            }
+            return;
+          }
+
+          ESP_LOGI("wizmote", "Unknown WizMote: %s (enable discovery mode to pair)", sender_mac.c_str());
+  on_broadcast:
+    then:
+      - lambda: |-
+          char mac_str[18];
+          snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                   info.src_addr[0], info.src_addr[1], info.src_addr[2],
+                   info.src_addr[3], info.src_addr[4], info.src_addr[5]);
+          std::string sender_mac(mac_str);
+
+          if (size != 13) return;
+
+          std::string configured_mac = id(wizmote_mac_address).state;
+          std::transform(configured_mac.begin(), configured_mac.end(), configured_mac.begin(), ::tolower);
+
+          if (configured_mac == "00:00:00:00:00:00" || configured_mac == "" || sender_mac != configured_mac) return;
+
+          // Note the last valid packet so the ETH channel-scan can lock on.
+          id(wizmote_last_packet_ms) = millis();
+
+          uint32_t sequence = (data[4] << 24) | (data[3] << 16) | (data[2] << 8) | data[1];
+          uint8_t button = data[6];
+
+          if (sequence == id(wizmote_last_sequence)) return;
+          id(wizmote_last_sequence) = sequence;
+
+          ESP_LOGI("wizmote", "Button: %d seq=%d from %s", button, sequence, sender_mac.c_str());
+          id(process_wizmote_button).execute(button);
+
+esphome:
+  on_boot:
+    # Re-add the saved WizMote peer after ESP-NOW is up.
+    - priority: -100
+      then:
+        - delay: 2s
+        - if:
+            condition:
+              lambda: |-
+                std::string mac = id(wizmote_mac_address).state;
+                return (mac != "00:00:00:00:00:00" && mac != "");
+            then:
+              - logger.log: "Restoring WizMote pairing on boot..."
+              - espnow.peer.add:
+                  address: !lambda |-
+                    std::string mac = id(wizmote_mac_address).state;
+                    std::array<uint8_t, 6> mac_bytes;
+                    sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                           &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                           &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+                    return mac_bytes;

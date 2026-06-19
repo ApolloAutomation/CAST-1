@@ -1,5 +1,8 @@
 substitutions:
-  version: "26.6.18.1"
+  version: "26.6.19.1"
+
+packages:
+  wizmote: !include wizmote.yaml
 
 esp32:
   variant: ESP32S3
