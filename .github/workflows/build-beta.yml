@@ -1,0 +1,93 @@
+name: Build and Publish Beta
+
+# Builds CAST-1 firmware from the beta branch and publishes it as assets on a
+# rolling "beta" pre-release. The on-device "Firmware Channel" select points OTA
+# updates at these assets. Stable firmware is built/published separately by
+# build.yml (push to main -> GitHub Pages).
+
+on:
+  push:
+    branches: [beta]
+    paths:
+      - 'Integrations/ESPHome/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    name: Read version
+    runs-on: ubuntu-latest
+    outputs:
+      v: ${{ steps.read.outputs.v }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: read
+        run: |
+          v=$(awk '/substitutions:/ {f=1} f && /version:/ {print $2; exit}' \
+            Integrations/ESPHome/Core.yaml | tr -d '"')
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+          echo "Beta version: $v"
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
+          - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
+    uses: esphome/workflows/.github/workflows/build.yml@2025.10.0
+    with:
+      files: ${{ matrix.yaml }}
+      esphome-version: stable
+      combined-name: ${{ matrix.name }}
+      release-version: ${{ needs.version.outputs.v }}
+
+  publish-beta:
+    name: Publish beta release assets
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: fw
+          pattern: firmware*
+
+      - name: Ensure rolling 'beta' pre-release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view beta -R "${{ github.repository }}" >/dev/null 2>&1 \
+            || gh release create beta -R "${{ github.repository }}" \
+                 --prerelease --title "Beta (rolling)" \
+                 --notes "Latest CAST-1 beta firmware. Auto-updated on every push to the beta branch."
+
+      - name: Rewrite manifests to absolute URLs and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE="https://github.com/${{ github.repository }}/releases/download/beta"
+          for v in w e; do
+            man=$(find "fw/firmware-$v" -name manifest.json | head -1)
+            if [ -z "$man" ]; then
+              echo "::error::manifest.json not found for firmware-$v"
+              exit 1
+            fi
+            echo "Rewriting $man"
+            # Make ota.path and parts[].path absolute release-asset URLs so the
+            # device never has to resolve a relative path against a redirected URL.
+            jq --arg base "$BASE" '
+              .builds[0].ota.path = ($base + "/" + (.builds[0].ota.path | sub(".*/"; "")))
+              | .builds[0].parts[0].path = ($base + "/" + (.builds[0].parts[0].path | sub(".*/"; "")))
+            ' "$man" > "manifest-$v.json"
+            cat "manifest-$v.json"
+            gh release upload beta "manifest-$v.json" -R "${{ github.repository }}" --clobber
+            find "fw/firmware-$v" -name '*.bin' -print -exec \
+              gh release upload beta {} -R "${{ github.repository }}" --clobber \;
+          done
+          echo "Beta assets published."
