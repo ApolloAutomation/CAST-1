@@ -8,50 +8,50 @@ blueprint:
     built-in action (Play, Volume, etc.) are handled on the device and never
     reach this automation.
   domain: automation
-  source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Integrations/HomeAssistant/cast-1-wizmote.yaml
+  source_url: https://github.com/ApolloAutomation/CAST-1/blob/main/Blueprints/cast-1-wizmote.yaml
   input:
     on_action:
-      name: On
+      name: "On"
       default: []
       selector:
         action:
     off_action:
-      name: Off
+      name: "Off"
       default: []
       selector:
         action:
     night_action:
-      name: Night
+      name: "Night"
       default: []
       selector:
         action:
     bright_up_action:
-      name: Brightness Up
+      name: "Brightness Up"
       default: []
       selector:
         action:
     bright_down_action:
-      name: Brightness Down
+      name: "Brightness Down"
       default: []
       selector:
         action:
     button_1_action:
-      name: Button 1
+      name: "Button 1"
       default: []
       selector:
         action:
     button_2_action:
-      name: Button 2
+      name: "Button 2"
       default: []
       selector:
         action:
     button_3_action:
-      name: Button 3
+      name: "Button 3"
       default: []
       selector:
         action:
     button_4_action:
-      name: Button 4
+      name: "Button 4"
       default: []
       selector:
         action:
