@@ -74,6 +74,102 @@ switch:
     on_turn_off:
       - lambda: 'id(wizmote_status).update();'
 
+# One dropdown per WizMote button. Change these in Home Assistant to remap a
+# button -- no YAML editing. "Send HA Event" fires esphome.cast1_wizmote_event
+# with the button label in the payload so you can wire it to anything in HA.
+select:
+  - platform: template
+    name: "WizMote On"
+    id: wizmote_action_on
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Play"
+    options: &wizmote_actions
+      - "Nothing"
+      - "Play"
+      - "Pause"
+      - "Play / Pause"
+      - "Next Track"
+      - "Previous Track"
+      - "Volume Up"
+      - "Volume Down"
+      - "Toggle Light"
+      - "Send HA Event"
+  - platform: template
+    name: "WizMote Off"
+    id: wizmote_action_off
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Pause"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Night"
+    id: wizmote_action_night
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Toggle Light"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Brightness Up"
+    id: wizmote_action_bright_up
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Volume Up"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Brightness Down"
+    id: wizmote_action_bright_down
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Volume Down"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 1"
+    id: wizmote_action_btn1
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Previous Track"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 2"
+    id: wizmote_action_btn2
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Next Track"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 3"
+    id: wizmote_action_btn3
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Send HA Event"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 4"
+    id: wizmote_action_btn4
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Send HA Event"
+    options: *wizmote_actions
+
 text_sensor:
   - platform: template
     name: "WizMote Status"
@@ -144,97 +240,151 @@ text:
       - lambda: 'id(wizmote_status).update();'
 
 script:
-  # WizMote button -> action mapping
-  - id: process_wizmote_button
+  # Run one action. `action` is the chosen menu string; `button` is the label
+  # used in the HA event payload when the action is "Send HA Event".
+  - id: run_wizmote_action
     parameters:
-      button: int
+      action: string
+      button: string
     then:
-      # ON -> play / resume
+      - logger.log:
+          tag: wizmote
+          format: "button %s -> %s"
+          args: ['button.c_str()', 'action.c_str()']
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_ON};'
+            lambda: 'return action == "Play";'
           then:
-            - logger.log:
-                tag: wizmote
-                format: "ON -> play"
             - media_player.play: sendspin_group_media_player
-      # OFF -> pause
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_OFF};'
+            lambda: 'return action == "Pause";'
           then:
-            - logger.log:
-                tag: wizmote
-                format: "OFF -> pause"
             - media_player.pause: sendspin_group_media_player
-      # Scene 1 -> previous track
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_1};'
+            lambda: 'return action == "Play / Pause";'
           then:
-            - logger.log:
-                tag: wizmote
-                format: "Scene 1 -> previous track"
-            - media_player.previous: sendspin_group_media_player
-      # Scene 2 -> next track
+            - media_player.toggle: sendspin_group_media_player
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_2};'
+            lambda: 'return action == "Next Track";'
           then:
-            - logger.log:
-                tag: wizmote
-                format: "Scene 2 -> next track"
             - media_player.next: sendspin_group_media_player
-      # Scene 3 -> fire HA event (map to a playlist/favorite in Home Assistant)
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_3};'
+            lambda: 'return action == "Previous Track";'
           then:
-            - logger.log:
-                tag: wizmote
-                format: "Scene 3 -> HA event esphome.cast1_wizmote_scene_3"
-            - homeassistant.event:
-                event: esphome.cast1_wizmote_scene_3
-      # Scene 4 -> fire HA event (map to a playlist/favorite in Home Assistant)
+            - media_player.previous: sendspin_group_media_player
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_4};'
-          then:
-            - logger.log:
-                tag: wizmote
-                format: "Scene 4 -> HA event esphome.cast1_wizmote_scene_4"
-            - homeassistant.event:
-                event: esphome.cast1_wizmote_scene_4
-      # Bright + -> volume up (this speaker)
-      - if:
-          condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_UP};'
+            lambda: 'return action == "Volume Up";'
           then:
             - media_player.volume_up: external_media_player
             - logger.log:
                 tag: wizmote
-                format: "Bright+ -> volume up (now %.0f%%)"
+                format: "  volume now %.0f%%"
                 args: ['id(external_media_player).volume * 100.0f']
-      # Bright - -> volume down (this speaker)
       - if:
           condition:
-            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_DOWN};'
+            lambda: 'return action == "Volume Down";'
           then:
             - media_player.volume_down: external_media_player
             - logger.log:
                 tag: wizmote
-                format: "Bright- -> volume down (now %.0f%%)"
+                format: "  volume now %.0f%%"
                 args: ['id(external_media_player).volume * 100.0f']
-      # Night -> toggle the RGB light
+      - if:
+          condition:
+            lambda: 'return action == "Toggle Light";'
+          then:
+            - light.toggle: rgb_light
+      - if:
+          condition:
+            lambda: 'return action == "Send HA Event";'
+          then:
+            - homeassistant.event:
+                event: esphome.cast1_wizmote_event
+                data:
+                  button: !lambda 'return button;'
+
+  # Look up the configured action for the pressed button, then run it.
+  - id: process_wizmote_button
+    parameters:
+      button: int
+    then:
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_ON};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_on).state;'
+                button: "on"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_OFF};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_off).state;'
+                button: "off"
       - if:
           condition:
             lambda: 'return button == ${WIZMOTE_BUTTON_NIGHT};'
           then:
-            - logger.log:
-                tag: wizmote
-                format: "Night -> toggle RGB light"
-            - light.toggle: rgb_light
-      # Anything else: log it so unmapped buttons are visible
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_night).state;'
+                button: "night"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_UP};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_bright_up).state;'
+                button: "brightness_up"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_DOWN};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_bright_down).state;'
+                button: "brightness_down"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_1};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn1).state;'
+                button: "1"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_2};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn2).state;'
+                button: "2"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_3};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn3).state;'
+                button: "3"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_4};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn4).state;'
+                button: "4"
       - if:
           condition:
             lambda: |-
