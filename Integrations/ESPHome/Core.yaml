@@ -125,11 +125,6 @@ switch:
   - platform: factory_reset
     id: factory_reset_switch
     disabled_by_default: true
-  - platform: gpio
-    pin: GPIO21
-    name: Enable DAC
-    id: enable_dac
-    restore_mode: ALWAYS_ON
 
 text_sensor:
   - platform: sendspin
@@ -347,10 +342,6 @@ media_player:
                 id: media_mixer_input
                 decibel_reduction: 0
                 duration: 1.0s
-
-
-
-
 
 script:
   - id: apply_ota_source
