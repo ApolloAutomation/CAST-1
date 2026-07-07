@@ -1,5 +1,9 @@
 substitutions:
-  version: "26.6.18.1"
+  version: "26.7.7.1"
+
+
+packages:
+  wizmote: !include wizmote.yaml
 
 esp32:
   variant: ESP32S3
@@ -204,14 +208,6 @@ select:
       then:
         - script.execute: apply_ota_source
 
-remote_receiver:
-  pin: 
-    number: GPIO07
-    inverted: true
-    mode:
-      input: true
-  dump: all
-
 audio_dac:
   - platform: pcm5122
     id: external_dac
@@ -363,8 +359,8 @@ script:
     # x Firmware Channel (Main/Beta). Main = GitHub Pages, Beta = GitHub release assets.
     then:
       - lambda: |-
-          const bool eth  = id(firmware_selector).state == "Ethernet";
-          const bool beta = id(firmware_channel).state == "Beta";
+          const bool eth  = id(firmware_selector).current_option() == "Ethernet";
+          const bool beta = id(firmware_channel).current_option() == "Beta";
           std::string url;
           if (beta) {
             url = eth
