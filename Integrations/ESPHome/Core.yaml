@@ -1,5 +1,6 @@
 substitutions:
-  version: "26.6.22.1"
+  version: "26.7.7.1"
+
 
 packages:
   wizmote: !include wizmote.yaml
@@ -358,8 +359,8 @@ script:
     # x Firmware Channel (Main/Beta). Main = GitHub Pages, Beta = GitHub release assets.
     then:
       - lambda: |-
-          const bool eth  = id(firmware_selector).state == "Ethernet";
-          const bool beta = id(firmware_channel).state == "Beta";
+          const bool eth  = id(firmware_selector).current_option() == "Ethernet";
+          const bool beta = id(firmware_channel).current_option() == "Beta";
           std::string url;
           if (beta) {
             url = eth
