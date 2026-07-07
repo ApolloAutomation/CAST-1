@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.7.7.3"
+  version: "26.7.7.4"
 
 
 packages:
@@ -16,15 +16,6 @@ esp32:
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
       CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
-
-      CONFIG_SPIRAM_RODATA: "y"
-      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
-
-      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
-      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
-
-      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
-      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
 
 api:
 
@@ -265,11 +256,10 @@ media_source:
 
   - platform: audio_http
     id: http_media_source
-    buffer_size: 200000
+    buffer_size: 100000
 
   - platform: audio_http
     id: http_announcement_source
-    buffer_size: 200000
 
 media_player:
   - platform: sendspin
