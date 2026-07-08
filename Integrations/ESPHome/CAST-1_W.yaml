@@ -96,5 +96,14 @@ text_sensor:
       id: wifi_ip
       entity_category: "diagnostic"
 
+# GPIO21 drives the DAC enable on the WiFi PCB. It used to live in Core.yaml
+# but moved here because GPIO21 is the W5500 reset pin on the Ethernet PCB.
+switch:
+  - platform: gpio
+    pin: GPIO21
+    name: Enable DAC
+    id: enable_dac
+    restore_mode: ALWAYS_ON
+
 packages:
   core: !include Core.yaml

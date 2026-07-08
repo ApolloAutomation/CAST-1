@@ -1,0 +1,124 @@
+From 4e5cf36e40becd9e8462df29aadb99b512f4189d Mon Sep 17 00:00:00 2001
+From: Trevor Schirmer <trevor@apolloautomation.com>
+Date: Thu, 2 Jul 2026 15:20:12 -0400
+Subject: [PATCH] Add spike filter to time burst: reject sync measurements
+ biased by bulk-transfer queueing
+
+Sendspin control messages share the websocket TCP stream with bulk audio
+transfers. On slow links (SPI ethernet, weak WiFi) a track transfer
+saturates the link for minutes; time-sync responses queue behind the
+bulk data and come back biased by seconds. The Kalman time filter
+ingests them (adaptive forgetting amplifies the error), the clock
+estimate slews, and sync_task hard-syncs -- inserting silence / dropping
+frames every 1-3s: audibly choppy playback for the whole transfer.
+
+Reject completed bursts whose best max_error exceeds
+max(50ms, 20x converged baseline). The baseline relaxes 25% per
+rejection so a genuine persistent RTT change still converges.
+---
+ src/time_burst.cpp | 38 ++++++++++++++++++++++++++++++++++++--
+ src/time_burst.h   |  9 +++++++++
+ 2 files changed, 45 insertions(+), 2 deletions(-)
+
+diff --git a/src/time_burst.cpp b/src/time_burst.cpp
+index a4ef69f..17895e7 100644
+--- a/src/time_burst.cpp
++++ b/src/time_burst.cpp
+@@ -14,6 +14,8 @@
+ 
+ #include "time_burst.h"
+ 
++#include <algorithm>
++
+ #include "connection.h"
+ #include "constants.h"
+ #include "platform/logging.h"
+@@ -28,6 +30,34 @@ static const char* const TAG = "sendspin.time_burst";
+ // Public API
+ // ============================================================================
+ 
++bool SendspinTimeBurst::accept_burst_measurement_(int64_t max_error) {
++    // Never reject before a baseline exists (boot / after reset()).
++    if (this->baseline_max_error_ == std::numeric_limits<int64_t>::max()) {
++        this->baseline_max_error_ = max_error;
++        return true;
++    }
++    // Reject when 20x worse than the converged baseline, but never below a 50 ms floor
++    // (small absolute errors are harmless regardless of the ratio).
++    static constexpr int64_t REJECT_FLOOR_US = 50000;
++    static constexpr int64_t REJECT_MULTIPLIER = 20;
++    const int64_t threshold =
++        std::max<int64_t>(REJECT_FLOOR_US, this->baseline_max_error_ * REJECT_MULTIPLIER);
++    if (max_error > threshold) {
++        // Relax the baseline so a genuine persistent RTT change converges within ~a dozen
++        // bursts instead of freezing sync forever.
++        this->baseline_max_error_ += this->baseline_max_error_ / 4 + 1;
++        SS_LOGW(TAG,
++                "Rejecting time burst (max_error %" PRId64 " us > threshold %" PRId64
++                " us) - likely bulk-transfer queueing delay",
++                max_error, threshold);
++        return false;
++    }
++    if (max_error < this->baseline_max_error_) {
++        this->baseline_max_error_ = max_error;
++    }
++    return true;
++}
++
+ TimeBurstResult SendspinTimeBurst::loop(SendspinConnection* conn) {
+     // Consume burst completion flag set by on_time_response() (called between loop() invocations)
+     bool burst_completed_by_response = this->pending_burst_completed_;
+@@ -63,7 +93,8 @@ TimeBurstResult SendspinTimeBurst::loop(SendspinConnection* conn) {
+             if (this->burst_index_ >= this->burst_size_) {
+                 auto* time_filter = conn->get_time_filter();
+                 if (time_filter != nullptr &&
+-                    this->best_max_error_ < std::numeric_limits<int64_t>::max()) {
++                    this->best_max_error_ < std::numeric_limits<int64_t>::max() &&
++                    this->accept_burst_measurement_(this->best_max_error_)) {
+                     time_filter->update(this->best_offset_, this->best_max_error_,
+                                         this->best_timestamp_);
+                     SS_LOGV(TAG, "Burst complete (with timeouts), best max_error: %" PRId64 " us",
+@@ -113,7 +144,9 @@ bool SendspinTimeBurst::on_time_response(SendspinConnection* conn, int64_t offse
+     // Check if burst is complete
+     if (this->burst_index_ >= this->burst_size_) {
+         auto* time_filter = conn->get_time_filter();
+-        if (time_filter != nullptr && this->best_max_error_ < std::numeric_limits<int64_t>::max()) {
++        if (time_filter != nullptr &&
++            this->best_max_error_ < std::numeric_limits<int64_t>::max() &&
++            this->accept_burst_measurement_(this->best_max_error_)) {
+             time_filter->update(this->best_offset_, this->best_max_error_, this->best_timestamp_);
+             SS_LOGV(TAG, "Burst complete, best max_error: %" PRId64 " us", this->best_max_error_);
+         }
+@@ -139,6 +172,7 @@ void SendspinTimeBurst::configure(uint8_t burst_size, int64_t burst_interval_ms,
+ 
+ void SendspinTimeBurst::reset() {
+     this->burst_index_ = this->burst_size_;  // "complete" state; next loop will wait for interval
++    this->baseline_max_error_ = std::numeric_limits<int64_t>::max();
+     this->last_burst_complete_time_ = 0;
+     this->current_message_sent_time_ = 0;
+     this->pending_burst_completed_ = false;
+diff --git a/src/time_burst.h b/src/time_burst.h
+index 33ed9ba..08048e1 100644
+--- a/src/time_burst.h
++++ b/src/time_burst.h
+@@ -97,8 +97,17 @@ protected:
+     static constexpr int64_t DEFAULT_BURST_INTERVAL_MS = 10000;
+     static constexpr int64_t DEFAULT_RESPONSE_TIMEOUT_MS = 10000;
+ 
++    /// @brief Decide whether a completed burst's best measurement is trustworthy enough to
++    /// feed the Kalman filter. Rejects bursts whose max_error is grossly worse than the
++    /// converged baseline: those are biased by bulk-transfer queueing delay (head-of-line
++    /// blocking on the shared websocket), not by real clock error, and poison the filter.
++    /// The baseline relaxes on every rejection so a genuine persistent network change is
++    /// eventually accepted.
++    bool accept_burst_measurement_(int64_t max_error);
++
+     // 64-bit fields
+     int64_t best_max_error_{std::numeric_limits<int64_t>::max()};
++    int64_t baseline_max_error_{std::numeric_limits<int64_t>::max()};
+     int64_t best_offset_{0};
+     int64_t best_timestamp_{0};
+     int64_t current_message_sent_time_{0};
+-- 
+2.51.2
+

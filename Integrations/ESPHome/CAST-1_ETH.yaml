@@ -57,6 +57,10 @@ logger:
 
 ethernet:
   type: W5500
+  # TEMP-DIAG: default 26.67MHz gives ~2.5Mbit/s effective TCP — too slow for
+  # Music Assistant's faster-than-realtime track transfers (sendspin chop).
+  # Testing 40MHz; drop to 33.33MHz if the link is unstable.
+  clock_speed: 40MHz
   clk_pin: GPIO7
   mosi_pin: GPIO12
   miso_pin: GPIO11
@@ -87,31 +91,33 @@ text_sensor:
       id: eth_ip
       entity_category: "diagnostic"
 
+# TEMP-DIAG: espnow + WizMote channel scan disabled to A/B test choppy audio.
+# Restore this block (and the wizmote include in Core.yaml) after testing.
 # ESP-NOW has no WiFi to follow on the Ethernet variant, so it needs a
 # starting channel. The interval below scans channels until the WizMote is
 # heard, then holds. (The espnow handlers/entities live in Core.yaml.)
-espnow:
-  channel: 1
-
-interval:
-  - interval: 2s
-    then:
-      - if:
-          condition:
-            lambda: |-
-              std::string mac = id(wizmote_mac_address).state;
-              bool want = id(wizmote_discovery_mode).state ||
-                          (mac != "00:00:00:00:00:00" && mac != "");
-              return want && (millis() - id(wizmote_last_packet_ms) > 30000);
-          then:
-            - lambda: |-
-                id(wizmote_scan_channel)++;
-                if (id(wizmote_scan_channel) > 13) id(wizmote_scan_channel) = 1;
-            - espnow.set_channel:
-                channel: !lambda 'return id(wizmote_scan_channel);'
-            - logger.log:
-                format: "WizMote channel scan: trying channel %d"
-                args: ['id(wizmote_scan_channel)']
+# espnow:
+#   channel: 1
+#
+# interval:
+#   - interval: 2s
+#     then:
+#       - if:
+#           condition:
+#             lambda: |-
+#               std::string mac = id(wizmote_mac_address).state;
+#               bool want = id(wizmote_discovery_mode).state ||
+#                           (mac != "00:00:00:00:00:00" && mac != "");
+#               return want && (millis() - id(wizmote_last_packet_ms) > 30000);
+#           then:
+#             - lambda: |-
+#                 id(wizmote_scan_channel)++;
+#                 if (id(wizmote_scan_channel) > 13) id(wizmote_scan_channel) = 1;
+#             - espnow.set_channel:
+#                 channel: !lambda 'return id(wizmote_scan_channel);'
+#             - logger.log:
+#                 format: "WizMote channel scan: trying channel %d"
+#                 args: ['id(wizmote_scan_channel)']
 
 packages:
   core: !include Core.yaml
