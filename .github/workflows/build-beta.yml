@@ -37,8 +37,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
-          - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
+          - { yaml: Integrations/ESPHome/beta-channel/CAST-1_W.yaml,   name: firmware-w }
+          - { yaml: Integrations/ESPHome/beta-channel/CAST-1_ETH.yaml, name: firmware-e }
     uses: esphome/workflows/.github/workflows/build.yml@025a1e6255610c498ed590403b7e510b69e474df # 2026.4.1
     with:
       files: ${{ matrix.yaml }}

@@ -1,5 +1,10 @@
 substitutions:
-  version: "26.7.8.1"
+  version: "26.7.8.2"
+  # Default update channel on first boot (no stored user choice yet, i.e. a
+  # fresh flash). The beta-channel builds override this to "Beta" (see
+  # Integrations/ESPHome/beta-channel/) so firmware obtained from the beta
+  # channel keeps tracking it instead of offering a stable "downgrade".
+  firmware_channel_default: "Stable"
 
 
 packages:
@@ -203,7 +208,7 @@ select:
     options:
       - "Stable"
       - "Beta"
-    initial_option: "Stable"
+    initial_option: "${firmware_channel_default}"
     on_value:
       then:
         - script.execute: apply_ota_source
