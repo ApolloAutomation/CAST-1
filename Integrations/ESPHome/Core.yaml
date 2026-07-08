@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.7.7.2"
+  version: "26.7.8.1"
 
 
 packages:
@@ -365,8 +365,8 @@ script:
           std::string url;
           if (beta) {
             url = eth
-              ? "https://github.com/ApolloAutomation/CAST-1/releases/download/beta/manifest-e.json"
-              : "https://github.com/ApolloAutomation/CAST-1/releases/download/beta/manifest-w.json";
+              ? "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw/manifest-e.json"
+              : "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw/manifest-w.json";
           } else {
             url = eth
               ? "https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json"
