@@ -55,6 +55,13 @@ globals:
 psram:
   mode: octal
   speed: 80MHz
+  # All CAST-1 PCBs have PSRAM, so guarantee it (fail boot if absent). This flips
+  # ESPHome's psram_guaranteed flag, which unlocks the high-performance network
+  # tier: 512 WiFi RX buffers / 32 TX buffers and a much larger TCP receive
+  # window instead of the conservative defaults. Music Assistant bulk-downloads
+  # each track faster than realtime, and the small TCP window is what its flow
+  # control slams into at track changes/seeks. (VPE sets this too.)
+  ignore_not_found: false
 
 web_server:
   port: 80
@@ -243,30 +250,43 @@ speaker:
       - id: media_mixer_input
         timeout: never
 
+  # Resampler task stacks stay in internal RAM (default): they are hot audio
+  # tasks, and a PSRAM stack contends with the decode/ring buffers already in
+  # PSRAM during Music Assistant's bulk track transfers. (Matches VPE.)
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixer_input
+    sample_rate: 48000
+    bits_per_sample: 16
+
   - platform: resampler
     id: media_resampling_speaker
     output_speaker: media_mixer_input
-    task_stack_in_psram: true
     sample_rate: 48000
     bits_per_sample: 16
 
 
 sendspin:
   id: sendspin_hub
-  task_stack_in_psram: true
+  # Keep the sendspin server task's stack in internal RAM (VPE does the same).
+  # That single task services the websocket: audio ingest, JSON, and the
+  # time-sync replies the clock filter depends on — slowing it down with a
+  # PSRAM stack skews time sync, which surfaces as hard-sync silence gaps at
+  # track changes.
+  task_stack_in_psram: false
 
 media_source:
   - platform: sendspin
     id: sendspin_source
-    decode_memory: internal
+    # decode_memory deliberately unset (component default, matches VPE)
 
   - platform: audio_http
     id: http_media_source
-    buffer_size: 200000
+    buffer_size: 500000
 
   - platform: audio_http
     id: http_announcement_source
-    buffer_size: 200000
+    buffer_size: 250000
 
 media_player:
   - platform: sendspin
@@ -282,7 +302,7 @@ media_player:
       format: FLAC     # FLAC is the least processor intensive codec
       num_channels: 1  # Stereo audio is unnecessary for announcements
       sample_rate: 48000
-      speaker: announcement_mixer_input
+      speaker: announcement_resampling_speaker
       sources:
         - http_announcement_source
 
