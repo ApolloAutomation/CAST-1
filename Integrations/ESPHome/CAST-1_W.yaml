@@ -37,14 +37,6 @@ ota:
   - platform: http_request
     id: ota_managed
 
-http_request:
-  verify_ssl: true
-  # Beta OTA manifests/binaries are GitHub release assets, which 302-redirect to
-  # long signed CDN URLs (~900+ bytes). The default 512-byte RX buffer overflows
-  # ("Out of buffer"), so enlarge it. See esphome/esphome#13786.
-  buffer_size_rx: 4096
-  buffer_size_tx: 1024
-
 safe_mode:
 
 improv_serial:
