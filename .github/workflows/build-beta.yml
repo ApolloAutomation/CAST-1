@@ -37,8 +37,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
-          - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
+          - { yaml: Integrations/ESPHome/beta-channel/CAST-1_W.yaml,   name: firmware-w }
+          - { yaml: Integrations/ESPHome/beta-channel/CAST-1_ETH.yaml, name: firmware-e }
     uses: esphome/workflows/.github/workflows/build.yml@025a1e6255610c498ed590403b7e510b69e474df # 2026.4.1
     with:
       files: ${{ matrix.yaml }}
@@ -59,12 +59,12 @@ jobs:
           path: fw
           pattern: firmware*
 
-      - name: Ensure rolling 'beta' pre-release exists
+      - name: Ensure rolling 'beta-fw' pre-release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view beta -R "${{ github.repository }}" >/dev/null 2>&1 \
-            || gh release create beta -R "${{ github.repository }}" \
+          gh release view beta-fw -R "${{ github.repository }}" >/dev/null 2>&1 \
+            || gh release create beta-fw -R "${{ github.repository }}" \
                  --prerelease --title "Beta (rolling)" \
                  --notes "Latest CAST-1 beta firmware. Auto-updated on every push to the beta branch."
 
@@ -72,7 +72,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BASE="https://github.com/${{ github.repository }}/releases/download/beta"
+          BASE="https://github.com/${{ github.repository }}/releases/download/beta-fw"
           for v in w e; do
             man=$(find "fw/firmware-$v" -name manifest.json | head -1)
             if [ -z "$man" ]; then
@@ -87,8 +87,8 @@ jobs:
               | .builds[0].parts |= map(.path = ($base + "/" + (.path | sub(".*/"; ""))))
             ' "$man" > "manifest-$v.json"
             cat "manifest-$v.json"
-            gh release upload beta "manifest-$v.json" -R "${{ github.repository }}" --clobber
+            gh release upload beta-fw "manifest-$v.json" -R "${{ github.repository }}" --clobber
             find "fw/firmware-$v" -name '*.bin' -print -exec \
-              gh release upload beta {} -R "${{ github.repository }}" --clobber \;
+              gh release upload beta-fw {} -R "${{ github.repository }}" --clobber \;
           done
           echo "Beta assets published."

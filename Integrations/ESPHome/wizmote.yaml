@@ -319,7 +319,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_on).state;'
+                action: !lambda 'return id(wizmote_action_on).current_option();'
                 button: "on"
       - if:
           condition:
@@ -327,7 +327,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_off).state;'
+                action: !lambda 'return id(wizmote_action_off).current_option();'
                 button: "off"
       - if:
           condition:
@@ -335,7 +335,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_night).state;'
+                action: !lambda 'return id(wizmote_action_night).current_option();'
                 button: "night"
       - if:
           condition:
@@ -343,7 +343,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_bright_up).state;'
+                action: !lambda 'return id(wizmote_action_bright_up).current_option();'
                 button: "brightness_up"
       - if:
           condition:
@@ -351,7 +351,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_bright_down).state;'
+                action: !lambda 'return id(wizmote_action_bright_down).current_option();'
                 button: "brightness_down"
       - if:
           condition:
@@ -359,7 +359,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_btn1).state;'
+                action: !lambda 'return id(wizmote_action_btn1).current_option();'
                 button: "1"
       - if:
           condition:
@@ -367,7 +367,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_btn2).state;'
+                action: !lambda 'return id(wizmote_action_btn2).current_option();'
                 button: "2"
       - if:
           condition:
@@ -375,7 +375,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_btn3).state;'
+                action: !lambda 'return id(wizmote_action_btn3).current_option();'
                 button: "3"
       - if:
           condition:
@@ -383,7 +383,7 @@ script:
           then:
             - script.execute:
                 id: run_wizmote_action
-                action: !lambda 'return id(wizmote_action_btn4).state;'
+                action: !lambda 'return id(wizmote_action_btn4).current_option();'
                 button: "4"
       - if:
           condition:
