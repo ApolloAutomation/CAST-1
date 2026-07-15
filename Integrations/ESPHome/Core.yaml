@@ -1,9 +1,39 @@
 substitutions:
-  version: "26.7.7.1"
+  version: "26.7.14.1"
+  # Default update channel on first boot (no stored user choice yet, i.e. a
+  # fresh flash). The beta-channel builds override this to "Beta" (see
+  # Integrations/ESPHome/beta-channel/) so firmware obtained from the beta
+  # channel keeps tracking it instead of offering a stable "downgrade".
+  firmware_channel_default: "Stable"
+  # Manifest URL bases. Stable = GitHub Pages (main branch builds).
+  # Beta = rolling "beta-fw" pre-release assets (beta branch builds).
+  stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
+  beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
 
 
 packages:
   wizmote: !include wizmote.yaml
+
+esphome:
+  # List form so package merging concatenates with each variant's own on_boot
+  # entries (mapping form would be replaced by the variant's block instead).
+  on_boot:
+    # Point the update entity at the selected type/channel manifest.
+    - priority: -100
+      then:
+        - script.execute: apply_ota_source
+    # Re-apply the Bluetooth Proxy switch after all components set up, so BLE
+    # scanning matches the persisted switch (proxy stays off by default).
+    - priority: -300
+      then:
+        - if:
+            condition:
+              switch.is_on: bluetooth_proxy_switch
+            then:
+              - esp32_ble_tracker.start_scan:
+                  continuous: true
+            else:
+              - esp32_ble_tracker.stop_scan:
 
 esp32:
   variant: ESP32S3
@@ -26,7 +56,17 @@ esp32:
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
 
+# BT allocations go to PSRAM first (CONFIG_BT_* options above), keeping
+# internal RAM free for the audio pipelines.
+esp32_ble_tracker:
+  id: ble_tracker
+  scan_parameters:
+    continuous: true
+
+bluetooth_proxy:
+
 api:
+  encryption:
 
 globals:
   - id: cycleCounter
@@ -55,10 +95,28 @@ globals:
 psram:
   mode: octal
   speed: 80MHz
+  # All CAST-1 PCBs have PSRAM, so guarantee it (fail boot if absent). This flips
+  # ESPHome's psram_guaranteed flag, which unlocks the high-performance network
+  # tier: 512 WiFi RX buffers / 32 TX buffers and a much larger TCP receive
+  # window instead of the conservative defaults. Music Assistant bulk-downloads
+  # each track faster than realtime, and the small TCP window is what its flow
+  # control slams into at track changes/seeks. (VPE sets this too.)
+  ignore_not_found: false
 
 web_server:
   port: 80
   version: 3
+
+http_request:
+  verify_ssl: true
+  # GitHub release-asset downloads answer with a redirect carrying a
+  # ~3.6 KB Content-Security-Policy header; each header line must fit
+  # this buffer or the request fails with "HTTP_CLIENT: Out of buffer".
+  buffer_size_rx: 5120
+  # The redirect target is a signed URL with a ~850-char query string; the
+  # follow-up request line must fit the TX buffer or esp_http_client_open
+  # fails with "Out of buffer" before sending anything.
+  buffer_size_tx: 2048
 
 i2c:
   sda: GPIO47
@@ -72,11 +130,17 @@ button:
   - platform: template
     name: "Firmware Update"
     id: update_firmware
+    icon: mdi:cloud-download
     entity_category: config
     on_press:
-      then:
-        - lambda: |-
-            id(update_http_request).perform(true);
+      - logger.log: "Applying firmware update for the selected type and channel"
+      - delay: 3s
+      - script.execute: apply_ota_source
+      - script.wait: apply_ota_source
+      # The manifest fetch runs in its own task; give it a fixed window to land
+      # (update.is_available stays false for same-version switches).
+      - delay: 5s
+      - lambda: id(update_http_request).perform(true);
 
 binary_sensor:
   - platform: status
@@ -131,6 +195,19 @@ switch:
     name: Enable DAC
     id: enable_dac
     restore_mode: ALWAYS_ON
+
+  - platform: template
+    name: "Bluetooth Proxy"
+    id: bluetooth_proxy_switch
+    icon: mdi:bluetooth
+    entity_category: "config"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    on_turn_on:
+      - esp32_ble_tracker.start_scan:
+          continuous: true
+    on_turn_off:
+      - esp32_ble_tracker.stop_scan:
 
 text_sensor:
   - platform: sendspin
@@ -201,9 +278,9 @@ select:
     optimistic: true
     restore_value: true
     options:
-      - "Main"
+      - "Stable"
       - "Beta"
-    initial_option: "Main"
+    initial_option: "${firmware_channel_default}"
     on_value:
       then:
         - script.execute: apply_ota_source
@@ -243,30 +320,43 @@ speaker:
       - id: media_mixer_input
         timeout: never
 
+  # Resampler task stacks stay in internal RAM (default): they are hot audio
+  # tasks, and a PSRAM stack contends with the decode/ring buffers already in
+  # PSRAM during Music Assistant's bulk track transfers. (Matches VPE.)
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixer_input
+    sample_rate: 48000
+    bits_per_sample: 16
+
   - platform: resampler
     id: media_resampling_speaker
     output_speaker: media_mixer_input
-    task_stack_in_psram: true
     sample_rate: 48000
     bits_per_sample: 16
 
 
 sendspin:
   id: sendspin_hub
-  task_stack_in_psram: true
+  # Keep the sendspin server task's stack in internal RAM (VPE does the same).
+  # That single task services the websocket: audio ingest, JSON, and the
+  # time-sync replies the clock filter depends on — slowing it down with a
+  # PSRAM stack skews time sync, which surfaces as hard-sync silence gaps at
+  # track changes.
+  task_stack_in_psram: false
 
 media_source:
   - platform: sendspin
     id: sendspin_source
-    decode_memory: internal
+    # decode_memory deliberately unset (component default, matches VPE)
 
   - platform: audio_http
     id: http_media_source
-    buffer_size: 200000
+    buffer_size: 500000
 
   - platform: audio_http
     id: http_announcement_source
-    buffer_size: 200000
+    buffer_size: 250000
 
 media_player:
   - platform: sendspin
@@ -282,7 +372,7 @@ media_player:
       format: FLAC     # FLAC is the least processor intensive codec
       num_channels: 1  # Stereo audio is unnecessary for announcements
       sample_rate: 48000
-      speaker: announcement_mixer_input
+      speaker: announcement_resampling_speaker
       sources:
         - http_announcement_source
 
@@ -356,7 +446,8 @@ media_player:
 script:
   - id: apply_ota_source
     # Sets the OTA source URL from the two selectors: Firmware Type (WiFi/Ethernet)
-    # x Firmware Channel (Main/Beta). Main = GitHub Pages, Beta = GitHub release assets.
+    # x Firmware Channel (Stable/Beta). Stable = GitHub Pages (main branch builds),
+    # Beta = rolling "beta-fw" release assets.
     then:
       - lambda: |-
           const bool eth  = id(firmware_selector).current_option() == "Ethernet";
@@ -364,13 +455,14 @@ script:
           std::string url;
           if (beta) {
             url = eth
-              ? "https://github.com/ApolloAutomation/CAST-1/releases/download/beta/manifest-e.json"
-              : "https://github.com/ApolloAutomation/CAST-1/releases/download/beta/manifest-w.json";
+              ? "${beta_manifest_base}/manifest-e.json"
+              : "${beta_manifest_base}/manifest-w.json";
           } else {
             url = eth
-              ? "https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json"
-              : "https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json";
+              ? "${stable_manifest_base}/firmware-e/manifest.json"
+              : "${stable_manifest_base}/firmware-w/manifest.json";
           }
+          ESP_LOGI("firmware", "OTA manifest set to: %s", url.c_str());
           id(update_http_request).set_source_url(url);
       - component.update: update_http_request
   - id: statusCheck
