@@ -190,11 +190,6 @@ switch:
   - platform: factory_reset
     id: factory_reset_switch
     disabled_by_default: true
-  - platform: gpio
-    pin: GPIO21
-    name: Enable DAC
-    id: enable_dac
-    restore_mode: ALWAYS_ON
 
   - platform: template
     name: "Bluetooth Proxy"
