@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.7.14.1"
+  version: "26.7.16.1"
   # Default update channel on first boot (no stored user choice yet, i.e. a
   # fresh flash). The beta-channel builds override this to "Beta" (see
   # Integrations/ESPHome/beta-channel/) so firmware obtained from the beta
@@ -190,11 +190,6 @@ switch:
   - platform: factory_reset
     id: factory_reset_switch
     disabled_by_default: true
-  - platform: gpio
-    pin: GPIO21
-    name: Enable DAC
-    id: enable_dac
-    restore_mode: ALWAYS_ON
 
   - platform: template
     name: "Bluetooth Proxy"
