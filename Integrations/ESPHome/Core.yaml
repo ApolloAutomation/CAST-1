@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.7.16.1"
+  version: "26.7.22.1"
   # Default update channel on first boot (no stored user choice yet, i.e. a
   # fresh flash). The beta-channel builds override this to "Beta" (see
   # Integrations/ESPHome/beta-channel/) so firmware obtained from the beta
@@ -251,19 +251,6 @@ light:
           min_brightness: 50%
           max_brightness: 100%
 
-number:
-  - platform: template
-    name: Apollo CAST-1 Announce Volume
-    id: announce_volume
-    icon: mdi:volume-source
-    unit_of_measurement: "%"
-    min_value: 0
-    max_value: 100
-    step: 1
-    restore_value: true
-    initial_value: 50
-    optimistic: true
-
 select:
   - platform: template
     id: firmware_channel
@@ -403,7 +390,6 @@ media_player:
             - delay: 0.75s
             - media_player.volume_set:
                 id: external_media_player
-                volume: !lambda "return id(announce_volume).state / 100.0;"
             - wait_until:
                 - not:
                     media_player.is_announcing: external_media_player
@@ -413,7 +399,6 @@ media_player:
                 duration: 1.0s
             - media_player.volume_set:
                 id: external_media_player
-                volume: !lambda "return id(current_volume);"
             - light.turn_off:
                 id: rgb_light
             - lambda: id(announcement_triggered) = false;
