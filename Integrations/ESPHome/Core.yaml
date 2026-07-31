@@ -1,10 +1,5 @@
 substitutions:
-  version: "26.7.22.1"
-  # Default update channel on first boot (no stored user choice yet, i.e. a
-  # fresh flash). The beta-channel builds override this to "Beta" (see
-  # Integrations/ESPHome/beta-channel/) so firmware obtained from the beta
-  # channel keeps tracking it instead of offering a stable "downgrade".
-  firmware_channel_default: "Stable"
+  version: "26.7.31.1"
   # Manifest URL bases. Stable = GitHub Pages (main branch builds).
   # Beta = rolling "beta-fw" pre-release assets (beta branch builds).
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
@@ -185,8 +180,13 @@ sensor:
 
 switch:
   - platform: factory_reset
+    disabled_by_default: True
+    name: "Factory Reset ESP"
+    id: factory_reset_all
+
+  - platform: factory_reset
     id: factory_reset_switch
-    disabled_by_default: true
+    internal: true
 
   - platform: template
     name: "Bluetooth Proxy"
@@ -259,7 +259,7 @@ select:
     options:
       - "Stable"
       - "Beta"
-    initial_option: "${firmware_channel_default}"
+    initial_option: "Stable"
     on_value:
       then:
         - script.execute: apply_ota_source
@@ -340,11 +340,11 @@ media_source:
 media_player:
   - platform: sendspin
     id: sendspin_group_media_player
-    name: "Apollo CAST-1 Sendspin Player"
+    name: "Sendspin Player"
 
   - platform: speaker_source
     id: external_media_player
-    name: "Apollo CAST-1 Player"
+    name: "Player"
     volume_increment: 0.05
 
     announcement_pipeline:
