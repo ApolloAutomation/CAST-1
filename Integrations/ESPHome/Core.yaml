@@ -340,11 +340,11 @@ media_source:
 media_player:
   - platform: sendspin
     id: sendspin_group_media_player
-    name: "Apollo CAST-1 Sendspin Player"
+    name: "Sendspin Player"
 
   - platform: speaker_source
     id: external_media_player
-    name: "Apollo CAST-1 Player"
+    name: "Player"
     volume_increment: 0.05
 
     announcement_pipeline:
