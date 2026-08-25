@@ -62,6 +62,7 @@ wifi:
   post_connect_roaming: false
   ap:
     ssid: "Apollo CAST 1 Hotspot"
+  power_save_mode: none
 
 captive_portal:
 
