@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.8.26.3"
+  version: "26.8.26.4"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
@@ -685,15 +685,31 @@ script:
     # /wifisave on the Ethernet IP), and bounces ESP-NOW so it re-inits
     # standalone for the WizMote (the channel scan in wizmote.yaml takes
     # over). ethernet_expected persists so the next boot starts WiFi-silent.
+    #
+    # If the fallback hotspot is LIVE, reboot instead: ESPHome cannot
+    # relaunch a once-started AP within the same boot (ap_setup_ latch), so
+    # merely disabling WiFi would leave the next cable-out provisioning
+    # attempt with a half-dead hotspot (SSID joins, but 192.168.4.1 serves
+    # nothing — observed on hardware). The reboot lands Ethernet-only in
+    # seconds with the latch cleared, and happens at most once per setup.
     then:
       - lambda: "id(ethernet_expected) = true;"
-      - wifi.disable:
-      - lambda: |-
-          if (id(captive_portal_1).is_active()) {
-            id(captive_portal_1).end();
-          }
-          id(espnow_component).disable();
-          id(espnow_component).enable();
+      - if:
+          condition:
+            wifi.ap_active:
+          then:
+            - lambda: |-
+                ESP_LOGW("network", "Rebooting to fully release the active hotspot (one-time)");
+            - delay: 500ms
+            - lambda: "App.safe_reboot();"
+          else:
+            - wifi.disable:
+            - lambda: |-
+                if (id(captive_portal_1).is_active()) {
+                  id(captive_portal_1).end();
+                }
+                id(espnow_component).disable();
+                id(espnow_component).enable();
 
   - id: apply_ota_source
     # Set OTA manifest from the channel selector
