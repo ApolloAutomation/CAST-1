@@ -1,13 +1,4 @@
-# ---------------------------------------------------------------------------
-# WizMote remote control (ESP-NOW). Included by Core.yaml.
-#
-# Pair a WizMote with the Auto-Discovery switch, then control playback:
-#   ON/OFF -> play/pause, Scene 1/2 -> previous/next, Scene 3/4 -> HA events
-#   (esphome.cast1_wizmote_scene_3 / _4), Bright +/- -> volume, Night -> RGB light.
-#
-# The espnow: block carries no channel here so it follows the WiFi channel on
-# CAST-1_W. CAST-1_ETH (no WiFi) adds a starting channel + a scan interval.
-# ---------------------------------------------------------------------------
+# WizMote remote (ESP-NOW); included by Core.yaml
 
 substitutions:
   # WizMote button codes (ESP-NOW)
@@ -74,9 +65,7 @@ switch:
     on_turn_off:
       - lambda: 'id(wizmote_status).update();'
 
-# One dropdown per WizMote button. Change these in Home Assistant to remap a
-# button -- no YAML editing. "Send HA Event" fires esphome.cast1_wizmote_event
-# with the button label in the payload so you can wire it to anything in HA.
+# Remap buttons from HA; no YAML edits
 select:
   - platform: template
     name: "WizMote On"
@@ -240,8 +229,7 @@ text:
       - lambda: 'id(wizmote_status).update();'
 
 script:
-  # Run one action. `action` is the chosen menu string; `button` is the label
-  # used in the HA event payload when the action is "Send HA Event".
+  # Run one mapped action
   - id: run_wizmote_action
     parameters:
       action: string
@@ -308,7 +296,7 @@ script:
                 data:
                   button: !lambda 'return button;'
 
-  # Look up the configured action for the pressed button, then run it.
+  # Dispatch pressed button to its action
   - id: process_wizmote_button
     parameters:
       button: int
@@ -447,7 +435,7 @@ espnow:
 
           if (configured_mac == "00:00:00:00:00:00" || configured_mac == "" || sender_mac != configured_mac) return;
 
-          // Note the last valid packet so the ETH channel-scan can lock on.
+          // Lets ETH channel-scan lock on
           id(wizmote_last_packet_ms) = millis();
 
           uint32_t sequence = (data[4] << 24) | (data[3] << 16) | (data[2] << 8) | data[1];
@@ -461,7 +449,7 @@ espnow:
 
 esphome:
   on_boot:
-    # Re-add the saved WizMote peer after ESP-NOW is up.
+    # Restore saved WizMote peer after boot
     - priority: -100
       then:
         - delay: 2s
