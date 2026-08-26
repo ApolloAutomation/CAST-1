@@ -388,6 +388,34 @@ script:
                 format: "unmapped button %d"
                 args: ['button']
 
+# While Ethernet carries the network, WiFi is disabled and ESP-NOW owns the
+# radio: scan channels until the WizMote is heard. With WiFi enabled the
+# channel is pinned by the WiFi connection, so scanning is skipped (and
+# espnow.set_channel would be refused anyway).
+interval:
+  - id: wizmote_channel_scan
+    interval: 2s
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  wifi.enabled:
+              - lambda: |-
+                  std::string mac = id(wizmote_mac_address).state;
+                  bool want = id(wizmote_discovery_mode).state ||
+                              (mac != "00:00:00:00:00:00" && mac != "");
+                  return want && (millis() - id(wizmote_last_packet_ms) > 30000);
+          then:
+            - lambda: |-
+                id(wizmote_scan_channel)++;
+                if (id(wizmote_scan_channel) > 13) id(wizmote_scan_channel) = 1;
+            - espnow.set_channel:
+                channel: !lambda 'return id(wizmote_scan_channel);'
+            - logger.log:
+                format: "WizMote channel scan: trying channel %d"
+                args: ['id(wizmote_scan_channel)']
+
 espnow:
   id: espnow_component
   auto_add_peer: false

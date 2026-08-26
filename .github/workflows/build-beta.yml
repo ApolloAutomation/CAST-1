@@ -4,6 +4,12 @@ name: Build and Publish Beta
 # rolling "beta" pre-release. The on-device "Firmware Channel" select points OTA
 # updates at these assets. Stable firmware is built/published separately by
 # build.yml (push to main -> GitHub Pages).
+#
+# NOTE: the canonical (unified) firmware's Beta manifest is the manifest.json
+# asset, which only exists once this workflow has run with the three-entry
+# matrix below. After the unified-firmware change lands on main, merge it to
+# beta (or run this workflow manually) promptly — until then, canonical-build
+# devices switched to the Beta channel get a 404 on their update manifest.
 
 on:
   push:
@@ -37,6 +43,7 @@ jobs:
     strategy:
       matrix:
         include:
+          - { yaml: Integrations/ESPHome/CAST-1.yaml,     name: firmware }
           - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
           - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
     uses: esphome/workflows/.github/workflows/build.yml@9f6577fd37b5cf773ab1b9be929714a0dcd15661 # 2026.7.0
@@ -73,22 +80,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BASE="https://github.com/${{ github.repository }}/releases/download/beta-fw"
-          for v in w e; do
-            man=$(find "fw/firmware-$v" -name manifest.json | head -1)
+          for pair in "firmware:manifest.json" "firmware-w:manifest-w.json" "firmware-e:manifest-e.json"; do
+            dir="${pair%%:*}"
+            asset="${pair##*:}"
+            man=$(find "fw/$dir" -name manifest.json | head -1)
             if [ -z "$man" ]; then
-              echo "::error::manifest.json not found for firmware-$v"
+              echo "::error::manifest.json not found for $dir"
               exit 1
             fi
-            echo "Rewriting $man"
+            echo "Rewriting $man -> $asset"
             # Make ota.path and parts[].path absolute release-asset URLs so the
             # device never has to resolve a relative path against a redirected URL.
             jq --arg base "$BASE" '
               .builds[0].ota.path = ($base + "/" + (.builds[0].ota.path | sub(".*/"; "")))
               | .builds[0].parts |= map(.path = ($base + "/" + (.path | sub(".*/"; ""))))
-            ' "$man" > "manifest-$v.json"
-            cat "manifest-$v.json"
-            gh release upload beta-fw "manifest-$v.json" -R "${{ github.repository }}" --clobber
-            find "fw/firmware-$v" -name '*.bin' -print -exec \
+            ' "$man" > "$asset"
+            cat "$asset"
+            gh release upload beta-fw "$asset" -R "${{ github.repository }}" --clobber
+            find "fw/$dir" -name '*.bin' -print -exec \
               gh release upload beta-fw {} -R "${{ github.repository }}" --clobber \;
           done
           echo "Beta assets published."

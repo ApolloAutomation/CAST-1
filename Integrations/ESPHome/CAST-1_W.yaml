@@ -1,96 +1,22 @@
+# Legacy WiFi-variant shim. The firmware is identical to CAST-1.yaml
+# (WiFi + Ethernet in one image); only the device/project name and the OTA
+# manifest URLs differ, so devices originally flashed with the WiFi firmware
+# keep updating from their original manifest without a reflash.
+# New installs should use CAST-1.yaml.
+
+substitutions:
+  stable_manifest_dir: "firmware-w"
+  beta_manifest_file: "manifest-w.json"
 
 esphome:
   name: "apollo-cast-1-w"
-  friendly_name: Apollo CAST-1
-  comment: Apollo CAST-1
-  name_add_mac_suffix: true
-  platformio_options:
-    board_build.flash_mode: dio
-
   project:
     name: "ApolloAutomation.CAST-1-W"
     version: ${version}
 
-  min_version: 2026.6.0
-
-  on_boot:
-    - priority: 800
-      then:
-        - if:
-            condition:
-              - lambda: "return id(runTest);"
-            then:
-              - lambda: "id(testScript).execute();"
-    - priority: 500
-      then:
-        - text_sensor.template.publish:
-            id: apollo_firmware_version
-            state: "${version}"
-
 dashboard_import:
   package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1_W.yaml
   import_full_config: false
-
-ota:
-  - platform: esphome
-    id: ota_esphome
-  - platform: http_request
-    id: ota_managed
-
-safe_mode:
-  id: safe_mode_1
-
-improv_serial:
-  id: improv_serial_1
-
-esp32_improv:
-  id: esp32_improv_1
-  authorizer: none
-
-update:
-  - platform: http_request
-    id: update_http_request
-    name: Firmware Update
-    source: https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json
-
-logger:
-  id: logger_1
-
-wifi:
-  on_connect:
-    - component.update: update_http_request
-  id: wifi_1
-  # Workaround: roam scans drop active audio
-  post_connect_roaming: false
-  ap:
-    ssid: "Apollo CAST 1 Hotspot"
-  power_save_mode: none
-
-captive_portal:
-  id: captive_portal_1
-
-select:
-  - platform: template
-    id: firmware_selector
-    name: Firmware Type
-    icon: "mdi:test-tube"
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    options:
-      - "WiFi"
-      - "Ethernet"
-    initial_option: "WiFi"
-    on_value:
-      then:
-        - script.execute: apply_ota_source
-
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: "IP Address"
-      id: wifi_ip
-      entity_category: "diagnostic"
 
 packages:
   core: !include Core.yaml

@@ -1,0 +1,16 @@
+# Apollo CAST-1 — unified firmware with WiFi + Ethernet in one image.
+# Ethernet is preferred when plugged in; WiFi (and its provisioning hotspot)
+# takes over automatically when it is not. See Core.yaml for all device config.
+
+esphome:
+  name: "apollo-cast-1"
+  project:
+    name: "ApolloAutomation.CAST-1"
+    version: ${version}
+
+dashboard_import:
+  package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1.yaml
+  import_full_config: false
+
+packages:
+  core: !include Core.yaml
