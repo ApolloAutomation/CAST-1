@@ -1,7 +1,6 @@
 substitutions:
   version: "26.7.31.1"
-  # Manifest URL bases. Stable = GitHub Pages (main branch builds).
-  # Beta = rolling "beta-fw" pre-release assets (beta branch builds).
+  # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
 
@@ -10,15 +9,13 @@ packages:
   wizmote: !include wizmote.yaml
 
 esphome:
-  # List form so package merging concatenates with each variant's own on_boot
-  # entries (mapping form would be replaced by the variant's block instead).
+  # List form so variant on_boot entries merge
   on_boot:
-    # Point the update entity at the selected type/channel manifest.
+    # Point update entity at selected manifest
     - priority: -100
       then:
         - script.execute: apply_ota_source
-    # Re-apply the Bluetooth Proxy switch after all components set up, so BLE
-    # scanning matches the persisted switch (proxy stays off by default).
+    # Re-apply persisted Bluetooth Proxy state
     - priority: -300
       then:
         - if:
@@ -51,16 +48,17 @@ esp32:
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
 
-# BT allocations go to PSRAM first (CONFIG_BT_* options above), keeping
-# internal RAM free for the audio pipelines.
+# BT allocs in PSRAM; RAM free for audio
 esp32_ble_tracker:
   id: ble_tracker
   scan_parameters:
     continuous: true
 
 bluetooth_proxy:
+  id: bluetooth_proxy_1
 
 api:
+  id: api_1
   encryption:
 
 globals:
@@ -85,29 +83,23 @@ globals:
     initial_value: 'false'
 
 psram:
+  id: psram_1
   mode: octal
   speed: 80MHz
-  # All CAST-1 PCBs have PSRAM, so guarantee it (fail boot if absent). This flips
-  # ESPHome's psram_guaranteed flag, which unlocks the high-performance network
-  # tier: 512 WiFi RX buffers / 32 TX buffers and a much larger TCP receive
-  # window instead of the conservative defaults. Music Assistant bulk-downloads
-  # each track faster than realtime, and the small TCP window is what its flow
-  # control slams into at track changes/seeks. (VPE sets this too.)
+  # Guarantee PSRAM; unlocks fast network tier
   ignore_not_found: false
 
 web_server:
+  id: web_server_1
   port: 80
   version: 3
 
 http_request:
+  id: http_request_1
   verify_ssl: true
-  # GitHub release-asset downloads answer with a redirect carrying a
-  # ~3.6 KB Content-Security-Policy header; each header line must fit
-  # this buffer or the request fails with "HTTP_CLIENT: Out of buffer".
+  # Fits GitHub's ~3.6KB CSP redirect header
   buffer_size_rx: 5120
-  # The redirect target is a signed URL with a ~850-char query string; the
-  # follow-up request line must fit the TX buffer or esp_http_client_open
-  # fails with "Out of buffer" before sending anything.
+  # Fits GitHub's long signed redirect URL
   buffer_size_tx: 2048
 
 i2c:
@@ -117,6 +109,7 @@ i2c:
 
 button:
   - platform: restart
+    id: restart_button
     icon: mdi:power-cycle
     name: "ESP Reboot"
   - platform: template
@@ -129,8 +122,7 @@ button:
       - delay: 3s
       - script.execute: apply_ota_source
       - script.wait: apply_ota_source
-      # The manifest fetch runs in its own task; give it a fixed window to land
-      # (update.is_available stays false for same-version switches).
+      # Give async manifest fetch time to land
       - delay: 5s
       - lambda: id(update_http_request).perform(true);
 
@@ -203,18 +195,22 @@ switch:
 
 text_sensor:
   - platform: sendspin
+    id: sendspin_track_title
     type: title
     name: Track Title
 
   - platform: sendspin
+    id: sendspin_artist
     type: artist
     name: Artist
 
   - platform: sendspin
+    id: sendspin_album
     type: album
     name: Album
 
   - platform: version
+    id: esphome_version_sensor
     name: "ESPHome Version"
     hide_timestamp: true
     entity_category: "diagnostic"
@@ -299,9 +295,7 @@ speaker:
       - id: media_mixer_input
         timeout: never
 
-  # Resampler task stacks stay in internal RAM (default): they are hot audio
-  # tasks, and a PSRAM stack contends with the decode/ring buffers already in
-  # PSRAM during Music Assistant's bulk track transfers. (Matches VPE.)
+  # Hot audio tasks: stacks stay in internal RAM
   - platform: resampler
     id: announcement_resampling_speaker
     output_speaker: announcement_mixer_input
@@ -317,17 +311,13 @@ speaker:
 
 sendspin:
   id: sendspin_hub
-  # Keep the sendspin server task's stack in internal RAM (VPE does the same).
-  # That single task services the websocket: audio ingest, JSON, and the
-  # time-sync replies the clock filter depends on — slowing it down with a
-  # PSRAM stack skews time sync, which surfaces as hard-sync silence gaps at
-  # track changes.
+  # PSRAM stack skews time sync; keep internal
   task_stack_in_psram: false
 
 media_source:
   - platform: sendspin
     id: sendspin_source
-    # decode_memory deliberately unset (component default, matches VPE)
+    # decode_memory: component default
 
   - platform: audio_http
     id: http_media_source
@@ -348,8 +338,8 @@ media_player:
     volume_increment: 0.05
 
     announcement_pipeline:
-      format: FLAC     # FLAC is the least processor intensive codec
-      num_channels: 1  # Stereo audio is unnecessary for announcements
+      format: FLAC     # Least CPU-intensive codec
+      num_channels: 1  # Mono suffices for announcements
       sample_rate: 48000
       speaker: announcement_resampling_speaker
       sources:
@@ -357,7 +347,7 @@ media_player:
 
     media_pipeline:
       speaker: media_resampling_speaker
-      format: FLAC     # FLAC is the least processor intensive codec
+      format: FLAC     # Least CPU-intensive codec
       num_channels: 2
       sample_rate: 48000
       sources:
@@ -394,8 +384,7 @@ media_player:
             - lambda: id(announcement_triggered) = false;
 
     on_state:
-      # Core pcm5122 boots muted; nothing else unmutes the external DAC, so
-      # unmute it on every state change (idempotent).
+      # pcm5122 boots muted; unmute (idempotent)
       - audio_dac.mute_off: external_dac
       - if:
           condition:
@@ -415,9 +404,7 @@ media_player:
 
 script:
   - id: apply_ota_source
-    # Sets the OTA source URL from the two selectors: Firmware Type (WiFi/Ethernet)
-    # x Firmware Channel (Stable/Beta). Stable = GitHub Pages (main branch builds),
-    # Beta = rolling "beta-fw" release assets.
+    # Set OTA manifest from type + channel selectors
     then:
       - lambda: |-
           const bool eth  = id(firmware_selector).current_option() == "Ethernet";
