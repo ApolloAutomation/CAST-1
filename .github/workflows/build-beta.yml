@@ -32,18 +32,13 @@ jobs:
           echo "Beta version: $v"
 
   build:
-    name: Build ${{ matrix.name }}
+    name: Build firmware
     needs: version
-    strategy:
-      matrix:
-        include:
-          - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
-          - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
     uses: esphome/workflows/.github/workflows/build.yml@9f6577fd37b5cf773ab1b9be929714a0dcd15661 # 2026.7.0
     with:
-      files: ${{ matrix.yaml }}
+      files: Integrations/ESPHome/CAST-1.yaml
       esphome-version: stable
-      combined-name: ${{ matrix.name }}
+      combined-name: firmware
       release-version: ${{ needs.version.outputs.v }}
 
   publish-beta:
@@ -73,24 +68,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BASE="https://github.com/${{ github.repository }}/releases/download/beta-fw"
-          for v in w e; do
-            man=$(find "fw/firmware-$v" -name manifest.json | head -1)
-            if [ -z "$man" ]; then
-              echo "::error::manifest.json not found for firmware-$v"
-              exit 1
-            fi
-            echo "Rewriting $man"
-            # Make ota.path and parts[].path absolute release-asset URLs so the
-            # device never has to resolve a relative path against a redirected URL.
-            jq --arg base "$BASE" '
-              .builds[0].ota.path = ($base + "/" + (.builds[0].ota.path | sub(".*/"; "")))
-              | .builds[0].parts |= map(.path = ($base + "/" + (.path | sub(".*/"; ""))))
-            ' "$man" > "manifest-$v.json"
-            cat "manifest-$v.json"
-            gh release upload beta-fw "manifest-$v.json" -R "${{ github.repository }}" --clobber
-            find "fw/firmware-$v" -name '*.bin' -print -exec \
-              gh release upload beta-fw {} -R "${{ github.repository }}" --clobber \;
-          done
+          man=$(find fw -name manifest.json | head -1)
+          if [ -z "$man" ]; then
+            echo "::error::manifest.json not found"
+            exit 1
+          fi
+          echo "Rewriting $man"
+          # Make ota.path and parts[].path absolute release-asset URLs so the
+          # device never has to resolve a relative path against a redirected URL.
+          jq --arg base "$BASE" '
+            .builds[0].ota.path = ($base + "/" + (.builds[0].ota.path | sub(".*/"; "")))
+            | .builds[0].parts |= map(.path = ($base + "/" + (.path | sub(".*/"; ""))))
+          ' "$man" > manifest.json
+          cat manifest.json
+          gh release upload beta-fw manifest.json -R "${{ github.repository }}" --clobber
+          find fw -name '*.bin' -print -exec \
+            gh release upload beta-fw {} -R "${{ github.repository }}" --clobber \;
           echo "Beta assets published."
 
       - name: Point beta-fw tag at the built commit

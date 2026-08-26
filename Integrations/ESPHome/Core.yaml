@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.8.25.1"
+  version: "26.8.26.1"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
@@ -118,7 +118,7 @@ button:
     icon: mdi:cloud-download
     entity_category: config
     on_press:
-      - logger.log: "Applying firmware update for the selected type and channel"
+      - logger.log: "Applying firmware update for the selected channel"
       - delay: 3s
       - script.execute: apply_ota_source
       - script.wait: apply_ota_source
@@ -404,21 +404,13 @@ media_player:
 
 script:
   - id: apply_ota_source
-    # Set OTA manifest from type + channel selectors
+    # Set OTA manifest from the channel selector
     then:
       - lambda: |-
-          const bool eth  = id(firmware_selector).current_option() == "Ethernet";
           const bool beta = id(firmware_channel).current_option() == "Beta";
-          std::string url;
-          if (beta) {
-            url = eth
-              ? "${beta_manifest_base}/manifest-e.json"
-              : "${beta_manifest_base}/manifest-w.json";
-          } else {
-            url = eth
-              ? "${stable_manifest_base}/firmware-e/manifest.json"
-              : "${stable_manifest_base}/firmware-w/manifest.json";
-          }
+          std::string url = beta
+            ? "${beta_manifest_base}/manifest.json"
+            : "${stable_manifest_base}/firmware/manifest.json";
           ESP_LOGI("firmware", "OTA manifest set to: %s", url.c_str());
           id(update_http_request).set_source_url(url);
       - component.update: update_http_request

@@ -1,6 +1,5 @@
-
 esphome:
-  name: "apollo-cast-1-eth"
+  name: "apollo-cast-1"
   friendly_name: Apollo CAST-1
   comment: Apollo CAST-1
   name_add_mac_suffix: true
@@ -8,10 +7,11 @@ esphome:
     board_build.flash_mode: dio
 
   project:
-    name: "ApolloAutomation.CAST-1-ETH"
+    name: "ApolloAutomation.CAST-1"
     version: ${version}
 
-  min_version: 2026.6.0
+  # Multi-interface (network: priority:) shipped in 2026.8.0
+  min_version: 2026.8.0
 
   on_boot:
     - priority: 800
@@ -28,7 +28,7 @@ esphome:
             state: "${version}"
 
 dashboard_import:
-  package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1_ETH.yaml
+  package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1.yaml
   import_full_config: false
 
 ota:
@@ -40,14 +40,26 @@ ota:
 safe_mode:
   id: safe_mode_1
 
+improv_serial:
+  id: improv_serial_1
+
+esp32_improv:
+  id: esp32_improv_1
+  authorizer: none
+
 update:
   - platform: http_request
     id: update_http_request
     name: Firmware Update
-    source: https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json
+    source: https://apolloautomation.github.io/CAST-1/firmware/manifest.json
 
 logger:
   id: logger_1
+
+network:
+  priority:
+    - ethernet
+    - wifi
 
 ethernet:
   id: ethernet_1
@@ -59,34 +71,51 @@ ethernet:
   cs_pin: GPIO6
   interrupt_pin: GPIO13
   reset_pin: GPIO21
+  # Wired install: silence the wifi radio (no hotspot, and the WizMote
+  # channel scan needs the radio free). Unplugging brings wifi back.
+  on_connect:
+    - lambda: "id(ethernet_active) = true;"
+    - wifi.disable:
+    - component.update: update_http_request
+  on_disconnect:
+    - lambda: "id(ethernet_active) = false;"
+    - wifi.enable:
 
-select:
-  - platform: template
-    id: firmware_selector
-    name: Firmware Type
-    icon: "mdi:test-tube"
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    options:
-      - "WiFi"
-      - "Ethernet"
-    initial_option: "Ethernet"
-    on_value:
-      then:
-        - script.execute: apply_ota_source
+wifi:
+  id: wifi_1
+  on_connect:
+    - component.update: update_http_request
+  # Workaround: roam scans drop active audio
+  post_connect_roaming: false
+  # Wifi stays disabled indefinitely on wired installs; a nonzero value
+  # would reboot them. Hung devices are still covered by api reboot_timeout.
+  reboot_timeout: 0s
+  ap:
+    ssid: "Apollo CAST 1 Hotspot"
+  power_save_mode: none
+
+captive_portal:
+  id: captive_portal_1
+
+globals:
+  - id: ethernet_active
+    type: bool
+    restore_value: no
+    initial_value: "false"
 
 text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "WiFi IP Address"
+      id: wifi_ip
+      entity_category: "diagnostic"
   - platform: ethernet_info
     ip_address:
-      name: "IP Address"
+      name: "Ethernet IP Address"
       id: eth_ip
       entity_category: "diagnostic"
 
-# No WiFi: scan channels until WizMote heard
-espnow:
-  channel: 1
-
+# Wired installs have no wifi channel to follow: scan until WizMote heard
 interval:
   - id: wizmote_channel_scan
     interval: 2s
@@ -94,6 +123,7 @@ interval:
       - if:
           condition:
             lambda: |-
+              if (!id(ethernet_active)) return false;
               std::string mac = id(wizmote_mac_address).state;
               bool want = id(wizmote_discovery_mode).state ||
                           (mac != "00:00:00:00:00:00" && mac != "");
