@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.7.31.1"
+  version: "26.8.25.1"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
