@@ -19,10 +19,8 @@ variant or reflash to switch:
   network, or opens the "Apollo CAST 1 Hotspot" for setup if none is
   configured (Improv via Bluetooth or USB works too).
 
-Devices flashed with the older WiFi-only or Ethernet-only firmware receive
-this unified behavior automatically through their normal firmware update — no
-reflash needed. As part of that update the device adopts the unified name
-(`apollo-cast-1-xxxxxx`), so it may show a one-time rename in Home Assistant.
+Use the on-device **Network Connection** sensor (Diagnostics) to see which
+connection is active at a glance.
 
 ## WizMote
 

@@ -24,17 +24,11 @@ jobs:
       pull-requests: write
     with:
       device-name: cast-1
-      # CAST-1_ETH.yaml / CAST-1_W.yaml are transitional includes of the
-      # canonical CAST-1.yaml: all three builds are the same unified firmware.
-      # The legacy files stay listed ONLY so firmware-e/ and firmware-w/ keep
-      # publishing on Pages — fielded devices on the old variants poll those
-      # manifests, and a Pages deploy replaces the whole site. Remove the two
-      # legacy lines (and files) once the fleet has converged.
       yaml-files: |
         Integrations/ESPHome/CAST-1.yaml
-        Integrations/ESPHome/CAST-1_ETH.yaml
-        Integrations/ESPHome/CAST-1_W.yaml
-      firmware-names: "1:firmware,1_ETH:firmware-e,1_W:firmware-w"
+      # Maps CAST-1.yaml to the firmware/ output dir (the shared workflow's
+      # pattern key is everything after the last dash of the filename).
+      firmware-names: "1:firmware"
       core-yaml-path: Integrations/ESPHome/Core.yaml
       esphome-version: stable
       # Bypass check if manually triggered with bypass option

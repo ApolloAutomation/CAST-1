@@ -1,10 +1,8 @@
 substitutions:
-  version: "26.8.26.6"
+  version: "26.8.26.7"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
-  # Manifest targets for this build; legacy variant files override these so
-  # already-deployed devices keep updating from their original URLs.
   stable_manifest_dir: "firmware"
   beta_manifest_file: "manifest.json"
 

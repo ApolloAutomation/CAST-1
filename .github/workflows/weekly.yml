@@ -7,8 +7,6 @@ on:
 permissions:
   contents: read
 
-# Only the canonical unified config is built; the legacy variant files are
-# transitional one-line includes of it (see ci.yml).
 jobs:
   build:
     name: Weekly Build
