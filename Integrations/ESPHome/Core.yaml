@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.8.26.4"
+  version: "26.8.26.5"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
@@ -184,11 +184,13 @@ ethernet:
           # WiFi-silent boot (ethernet_expected): stays off.
           - lambda: "id(ethernet_expected) = true;"
     - component.update: update_http_request
+    - component.update: network_connection
   on_disconnect:
     # Cable gone: make sure WiFi is up so the device rejoins a saved network
     # or, with none configured, opens the provisioning hotspot.
     - lambda: "id(ethernet_expected) = false;"
     - wifi.enable:
+    - component.update: network_connection
 
 wifi:
   id: wifi_1
@@ -418,6 +420,26 @@ switch:
       - esp32_ble_tracker.stop_scan:
 
 text_sensor:
+  # Which path is carrying the device right now — for troubleshooting and
+  # HA notifications (e.g. alert when a wired device falls back to WiFi).
+  # Ethernet + WiFi = dual-home: traffic on the wire, WiFi held so Home
+  # Assistant never loses the device.
+  - platform: template
+    name: "Network Connection"
+    id: network_connection
+    icon: "mdi:network"
+    entity_category: "diagnostic"
+    update_interval: 10s
+    lambda: |-
+      const bool eth = id(ethernet_1).is_connected();
+      const bool sta = !id(wifi_1).is_disabled() && id(wifi_1).is_connected();
+      const bool ap  = !id(wifi_1).is_disabled() && id(wifi_1).is_ap_active();
+      if (eth && sta) return std::string("Ethernet + WiFi");
+      if (eth) return std::string("Ethernet");
+      if (sta) return std::string("WiFi");
+      if (ap) return std::string("Hotspot");
+      return std::string("Connecting");
+
   - platform: ethernet_info
     ip_address:
       name: "Ethernet IP Address"
