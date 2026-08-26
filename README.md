@@ -10,9 +10,12 @@ Easily make your speakers smart and cast to multiple devices using Music Assista
 One firmware covers both WiFi and Ethernet — there is no need to pick a
 variant or reflash to switch:
 
-- **Ethernet plugged in:** the device uses Ethernet and turns WiFi (including
-  the setup hotspot) off.
-- **No Ethernet:** WiFi turns on automatically. The device rejoins its saved
+- **Ethernet plugged in:** traffic moves to Ethernet. If the device is also
+  joined to your WiFi, that connection stays up alongside, so Home Assistant
+  never loses the device when you plug or unplug the cable. If WiFi has no
+  network to join, it turns off entirely — the setup hotspot is never active
+  while Ethernet is connected.
+- **No Ethernet:** WiFi works as usual. The device rejoins its saved
   network, or opens the "Apollo CAST 1 Hotspot" for setup if none is
   configured (Improv via Bluetooth or USB works too).
 

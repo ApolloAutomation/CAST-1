@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.8.26.1"
+  version: "26.8.26.2"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
@@ -121,25 +121,48 @@ ethernet:
   interrupt_pin: GPIO13
   reset_pin: GPIO21
   on_connect:
-    # Ethernet is up: turn WiFi (and the fallback hotspot) off. ESP-NOW rides
-    # the WiFi driver, so bounce it to re-init standalone; it re-adds the
-    # paired WizMote peer and the channel scan in wizmote.yaml takes over.
-    # ethernet_expected persists so the next boot starts with WiFi off.
-    - lambda: "id(ethernet_expected) = true;"
-    - wifi.disable:
-    - lambda: |-
-        // wifi.disable() tears down the AP but not the captive portal;
-        // left running it would keep answering DNS and /wifisave on the
-        // Ethernet IP until the next reboot.
-        if (id(captive_portal_1).is_active()) {
-          id(captive_portal_1).end();
-        }
-        id(espnow_component).disable();
-        id(espnow_component).enable();
+    # Ethernet is up. If WiFi is (or is about to be) connected to a network,
+    # keep it: the device runs dual-homed — Ethernet carries the routed
+    # traffic (network: priority:) while Home Assistant's connection to the
+    # WiFi address survives, so no rediscovery is ever needed. WiFi is turned
+    # off only when it has nothing to offer (hotspot active or nothing to
+    # join), which also guarantees the hotspot is never up while on Ethernet.
+    - if:
+        condition:
+          wifi.enabled:
+        then:
+          - if:
+              condition:
+                wifi.ap_active:
+              then:
+                # Fallback hotspot is broadcasting: WiFi has no network.
+                - script.execute: wifi_release_radio
+              else:
+                # Boot race: WiFi may still be associating; give it a moment.
+                - wait_until:
+                    condition:
+                      wifi.connected:
+                    timeout: 30s
+                - if:
+                    condition:
+                      wifi.connected:
+                    then:
+                      - lambda: "id(ethernet_expected) = false;"
+                    else:
+                      # Guard: if the cable vanished during the wait, leave
+                      # WiFi alone — it is the only path left.
+                      - if:
+                          condition:
+                            ethernet.connected:
+                          then:
+                            - script.execute: wifi_release_radio
+        else:
+          # WiFi-silent boot (ethernet_expected): stays off.
+          - lambda: "id(ethernet_expected) = true;"
     - component.update: update_http_request
   on_disconnect:
-    # Cable gone: bring WiFi back so the device rejoins a saved network or,
-    # with none configured, opens the provisioning hotspot.
+    # Cable gone: make sure WiFi is up so the device rejoins a saved network
+    # or, with none configured, opens the provisioning hotspot.
     - lambda: "id(ethernet_expected) = false;"
     - wifi.enable:
 
@@ -147,6 +170,29 @@ wifi:
   id: wifi_1
   on_connect:
     - component.update: update_http_request
+  on_disconnect:
+    # WiFi lost its network while Ethernet carries the device: after a grace
+    # period for reassociation, turn WiFi off rather than let the fallback
+    # hotspot appear (ap_timeout is 90s; deciding at 60s keeps it from ever
+    # starting). Harmless when triggered by wifi.disable itself — the
+    # wifi.enabled check below skips the release then.
+    - if:
+        condition:
+          ethernet.connected:
+        then:
+          - wait_until:
+              condition:
+                wifi.connected:
+              timeout: 60s
+          - if:
+              condition:
+                and:
+                  - wifi.enabled:
+                  - not:
+                      wifi.connected:
+                  - ethernet.connected:
+              then:
+                - script.execute: wifi_release_radio
   # Workaround: roam scans drop active audio
   post_connect_roaming: false
   ap:
@@ -557,6 +603,22 @@ media_player:
 
 
 script:
+  - id: wifi_release_radio
+    # Turn WiFi off while Ethernet carries the device: ends AP+STA, shuts
+    # down the captive portal (wifi.disable leaves it answering DNS and
+    # /wifisave on the Ethernet IP), and bounces ESP-NOW so it re-inits
+    # standalone for the WizMote (the channel scan in wizmote.yaml takes
+    # over). ethernet_expected persists so the next boot starts WiFi-silent.
+    then:
+      - lambda: "id(ethernet_expected) = true;"
+      - wifi.disable:
+      - lambda: |-
+          if (id(captive_portal_1).is_active()) {
+            id(captive_portal_1).end();
+          }
+          id(espnow_component).disable();
+          id(espnow_component).enable();
+
   - id: apply_ota_source
     # Set OTA manifest from the channel selector
     then:
