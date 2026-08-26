@@ -38,6 +38,7 @@ ota:
     id: ota_managed
 
 safe_mode:
+  id: safe_mode_1
 
 update:
   - platform: http_request
@@ -46,8 +47,10 @@ update:
     source: https://apolloautomation.github.io/CAST-1/firmware-e/manifest.json
 
 logger:
+  id: logger_1
 
 ethernet:
+  id: ethernet_1
   type: W5500
   clock_speed: 40MHz
   clk_pin: GPIO7
@@ -80,14 +83,13 @@ text_sensor:
       id: eth_ip
       entity_category: "diagnostic"
 
-# ESP-NOW has no WiFi to follow on the Ethernet variant, so it needs a
-# starting channel. The interval below scans channels until the WizMote is
-# heard, then holds. (The espnow handlers/entities live in Core.yaml.)
+# No WiFi: scan channels until WizMote heard
 espnow:
   channel: 1
 
 interval:
-  - interval: 2s
+  - id: wizmote_channel_scan
+    interval: 2s
     then:
       - if:
           condition:

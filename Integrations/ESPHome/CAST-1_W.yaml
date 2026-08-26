@@ -38,10 +38,13 @@ ota:
     id: ota_managed
 
 safe_mode:
+  id: safe_mode_1
 
 improv_serial:
+  id: improv_serial_1
 
 esp32_improv:
+  id: esp32_improv_1
   authorizer: none
 
 update:
@@ -51,20 +54,20 @@ update:
     source: https://apolloautomation.github.io/CAST-1/firmware-w/manifest.json
 
 logger:
+  id: logger_1
 
 wifi:
   on_connect:
     - component.update: update_http_request
   id: wifi_1
-  # Temporary workaround: post-connect roam scans briefly drop the Music
-  # Assistant stream mid-playback even on a strong signal. Remove this once
-  # esphome stops roaming from interrupting active playback.
+  # Workaround: roam scans drop active audio
   post_connect_roaming: false
   ap:
     ssid: "Apollo CAST 1 Hotspot"
   power_save_mode: none
 
 captive_portal:
+  id: captive_portal_1
 
 select:
   - platform: template
