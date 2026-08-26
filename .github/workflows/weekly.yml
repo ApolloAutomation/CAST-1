@@ -7,6 +7,8 @@ on:
 permissions:
   contents: read
 
+# Only the canonical unified config is built; the legacy variant files are
+# transitional one-line includes of it (see ci.yml).
 jobs:
   build:
     name: Weekly Build
@@ -14,10 +16,7 @@ jobs:
     with:
       yaml-files: |
         Integrations/ESPHome/CAST-1.yaml
-        Integrations/ESPHome/CAST-1_ETH.yaml
-        Integrations/ESPHome/CAST-1_W.yaml
       # dev excluded until the TemplateSelect .state incompatibility is fixed
       esphome-versions: |
         stable
         beta
-

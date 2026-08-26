@@ -1,22 +1,11 @@
-# Legacy WiFi-variant shim. The firmware is identical to CAST-1.yaml
-# (WiFi + Ethernet in one image); only the device/project name and the OTA
-# manifest URLs differ, so devices originally flashed with the WiFi firmware
-# keep updating from their original manifest without a reflash.
-# New installs should use CAST-1.yaml.
-
-substitutions:
-  stable_manifest_dir: "firmware-w"
-  beta_manifest_file: "manifest-w.json"
-
-esphome:
-  name: "apollo-cast-1-w"
-  project:
-    name: "ApolloAutomation.CAST-1-W"
-    version: ${version}
-
-dashboard_import:
-  package_import_url: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1_W.yaml
-  import_full_config: false
+# TRANSITIONAL — this file exists only so the legacy WiFi-firmware manifest
+# path (firmware-w/) keeps publishing while the fielded fleet converges. It
+# builds the canonical unified firmware verbatim, so a device still on the
+# old WiFi firmware OTAs straight into apollo-cast-1 and from then on
+# updates from the canonical manifest.
+#
+# Delete this file (and its entries in .github/workflows/build.yml and
+# build-beta.yml) once the fleet has had a release cycle or two to update.
 
 packages:
-  core: !include Core.yaml
+  unified: !include CAST-1.yaml

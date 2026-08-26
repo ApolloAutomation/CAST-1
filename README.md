@@ -21,7 +21,8 @@ variant or reflash to switch:
 
 Devices flashed with the older WiFi-only or Ethernet-only firmware receive
 this unified behavior automatically through their normal firmware update — no
-reflash needed.
+reflash needed. As part of that update the device adopts the unified name
+(`apollo-cast-1-xxxxxx`), so it may show a one-time rename in Home Assistant.
 
 ## WizMote
 

@@ -43,6 +43,10 @@ jobs:
     strategy:
       matrix:
         include:
+          # The _W/_ETH entries are transitional: those files are one-line
+          # includes of CAST-1.yaml, kept only so the legacy beta manifest
+          # assets (manifest-w.json / manifest-e.json) keep updating for
+          # fielded devices. Remove once the fleet has converged.
           - { yaml: Integrations/ESPHome/CAST-1.yaml,     name: firmware }
           - { yaml: Integrations/ESPHome/CAST-1_W.yaml,   name: firmware-w }
           - { yaml: Integrations/ESPHome/CAST-1_ETH.yaml, name: firmware-e }
