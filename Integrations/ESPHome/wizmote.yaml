@@ -388,10 +388,10 @@ script:
                 format: "unmapped button %d"
                 args: ['button']
 
-# While Ethernet carries the network, WiFi is disabled and ESP-NOW owns the
-# radio: scan channels until the WizMote is heard. With WiFi enabled the
-# channel is pinned by the WiFi connection, so scanning is skipped (and
-# espnow.set_channel would be refused anyway).
+# When WiFi has been released (device on Ethernet with no WiFi network),
+# ESP-NOW owns the radio: scan channels until the WizMote is heard. While
+# WiFi is enabled the channel is pinned by the WiFi connection, so scanning
+# is skipped (and espnow.set_channel would be refused anyway).
 interval:
   - id: wizmote_channel_scan
     interval: 2s
