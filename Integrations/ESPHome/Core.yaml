@@ -199,10 +199,12 @@ wifi:
     - lambda: "id(wifi_provisioned) = true;"
     - component.update: update_http_request
   on_disconnect:
-    # WiFi lost its network while Ethernet carries the device: after a grace
-    # period for reassociation, turn WiFi off rather than let the fallback
-    # hotspot appear (ap_timeout is 90s; deciding at 60s keeps it from ever
-    # starting). Harmless when triggered by wifi.disable itself — the
+    # WiFi lost its network while Ethernet carries the device: after up to
+    # 60s for reassociation, turn WiFi off rather than let the fallback
+    # hotspot appear (ap_timeout is 90s; deciding by 60s keeps it from ever
+    # starting). A reconnect-then-drop during the wait can release earlier
+    # than the full 60s — the 10-minute recovery probe restores dual-home in
+    # that case. Harmless when triggered by wifi.disable itself — the
     # wifi.enabled check below skips the release then.
     - if:
         condition:
@@ -711,7 +713,13 @@ script:
     # merely disabling WiFi would leave the next cable-out provisioning
     # attempt with a half-dead hotspot (SSID joins, but 192.168.4.1 serves
     # nothing — observed on hardware). The reboot lands Ethernet-only in
-    # seconds with the latch cleared, and happens at most once per setup.
+    # seconds with the latch cleared. It fires only when a live hotspot must
+    # be killed: a fresh device's first cable-connect, or an unprovisioned
+    # wired device whose cable was out long enough (>90s) for the hotspot to
+    # appear — in both cases the device had no network, so no playback is
+    # interrupted. A device on a regularly-failing switch repeats this per
+    # outage cycle; kept in preference to suppressing the cable-out hotspot,
+    # which is a documented provisioning path.
     then:
       - lambda: "id(ethernet_expected) = true;"
       - if:
