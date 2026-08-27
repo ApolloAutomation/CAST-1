@@ -5,6 +5,23 @@
 
 Easily make your speakers smart and cast to multiple devices using Music Assistant and Sendspin!
 
+## Connectivity
+
+One firmware covers both WiFi and Ethernet — there is no need to pick a
+variant or reflash to switch:
+
+- **Ethernet plugged in:** traffic moves to Ethernet. If the device is also
+  joined to your WiFi, that connection stays up alongside, so Home Assistant
+  never loses the device when you plug or unplug the cable. If WiFi has no
+  network to join, it turns off entirely — the setup hotspot is never active
+  while Ethernet is connected.
+- **No Ethernet:** WiFi works as usual. The device rejoins its saved
+  network, or opens the "Apollo CAST 1 Hotspot" for setup if none is
+  configured (Improv via Bluetooth or USB works too).
+
+Use the on-device **Network Connection** sensor (Diagnostics) to see which
+connection is active at a glance.
+
 ## WizMote
 
 The CAST-1 gives you full Home Assistant control over a paired Wiz WizMote. Each of the nine buttons (On, Off, Night, Brightness Up/Down, and 1–4) is a configurable select on the device — assign it Play, Pause, Play / Pause, Next/Previous Track, Volume Up/Down, Toggle Light, or Send HA Event. The defaults give you media controls out of the box.

@@ -14,10 +14,8 @@ jobs:
     uses: ApolloAutomation/Workflows/.github/workflows/esphome-ci.yml@main
     with:
       yaml-files: |
-        Integrations/ESPHome/CAST-1_ETH.yaml
-        Integrations/ESPHome/CAST-1_W.yaml
+        Integrations/ESPHome/CAST-1.yaml
       # dev excluded until the TemplateSelect .state incompatibility is fixed
       esphome-versions: |
         stable
         beta
-
