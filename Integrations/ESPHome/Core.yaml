@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.8.27.1"
+  version: "26.8.27.2"
   # Manifest bases: stable=Pages, beta=release assets
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
@@ -271,6 +271,12 @@ bluetooth_proxy:
 
 api:
   id: api_1
+  # A CAST-1 can legitimately run without a Home Assistant API client —
+  # streaming from Music Assistant uses sendspin's own outbound connection.
+  # The default 15-minute no-client reboot would restart such a device mid-
+  # playback every cycle (observed in the field), so it is disabled; crash
+  # recovery remains covered by safe_mode.
+  reboot_timeout: 0s
   encryption:
 
 globals:
