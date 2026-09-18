@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.8.28.1"
+  version: "26.9.18.2"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -220,6 +220,8 @@ esp32:
   framework:
     type: esp-idf
     version: recommended
+    advanced:
+      flash_chip: generic
     sdkconfig_options:
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
