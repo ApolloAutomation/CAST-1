@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.9.21.1"
+  version: "26.10.1.1"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -13,8 +13,8 @@ esphome:
   friendly_name: Apollo CAST-1
   comment: Apollo CAST-1
   name_add_mac_suffix: true
-  # network: priority: (WiFi + Ethernet in one firmware) needs 2026.8
-  min_version: 2026.8.0
+  # Must be 2026.9.1+, which moves Ethernet receive frames out of internal RAM
+  min_version: 2026.9.1
   platformio_options:
     board_build.flash_mode: dio
   # List form so package on_boot entries (wizmote.yaml) merge
