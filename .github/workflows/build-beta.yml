@@ -44,7 +44,7 @@ jobs:
       matrix:
         include:
           - { yaml: Integrations/ESPHome/CAST-1.yaml, name: firmware }
-    uses: esphome/workflows/.github/workflows/build.yml@9f6577fd37b5cf773ab1b9be929714a0dcd15661 # 2026.7.0
+    uses: esphome/workflows/.github/workflows/build.yml@cc3e76de337dc59bc1cba8da58d963cd23b873f1 # 2026.9.0
     with:
       files: ${{ matrix.yaml }}
       esphome-version: stable
