@@ -1,6 +1,8 @@
 # Apollo CAST-1
 
-<img src="CAST_Card.jpg" alt="Apollo CAST-1" width="600">
+<p align="center">
+  <img src="CAST_Card.jpg" alt="Apollo CAST-1" width="600">
+</p>
 
 Easily make your speakers smart and cast to multiple devices using Music Assistant and Sendspin!
 
