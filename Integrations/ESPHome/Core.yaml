@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.10.13.1"
+  version: "26.10.13.2"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -393,11 +393,14 @@ binary_sensor:
   - platform: template
     id: led_strip_music_playing
     internal: true
-    condition:
-      media_player.is_playing: external_media_player
+    # Sendspin's player and the HTTP source report stop at once; the main
+    # player only goes idle ~10s later, once its buffers drain
+    lambda: |-
+      return id(sendspin_group_media_player).state == media_player::MEDIA_PLAYER_STATE_PLAYING ||
+             id(http_media_source)->get_state() == media_source::MediaSourceState::PLAYING;
     filters:
       # Bridge track changes and rebuffering so the strip doesn't blink off
-      - delayed_off: 10s
+      - delayed_off: 3s
     on_press:
       - if:
           condition:
@@ -563,8 +566,15 @@ light:
     num_leds: ${LED_STRIP_MAX_LEDS}
     # The rest of the RMT TX memory after the onboard light's 48
     rmt_symbols: 144
+    # The RMT interrupt refills from these buffers mid-frame; PSRAM reads can
+    # stall it under audio load and cut the frame short
+    use_psram: false
     default_transition_length: 1s
     restore_mode: RESTORE_DEFAULT_OFF
+    # Re-send the settled frame once, so a frame cut short by a late refill
+    # can't leave stray LEDs lit when nothing else will redraw the strip
+    on_state:
+      - script.execute: led_strip_refresh
     effects:
       - addressable_rainbow:
           name: "Rainbow"
@@ -1039,6 +1049,12 @@ script:
             out->set_led_params(400, 1000, 1000, 400, 0, 0);
           }
           out->schedule_show();
+
+  - id: led_strip_refresh
+    mode: restart
+    then:
+      - delay: 1500ms
+      - lambda: "id(led_strip_output)->schedule_show();"
 
   - id: led_strip_music_start
     then:
