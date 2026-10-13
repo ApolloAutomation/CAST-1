@@ -1,0 +1,86 @@
+# External LED strip on the exposed 5V / GND / IO1 header; included by Core.yaml
+# Test config: set the count and chipset to match the strip being tested
+
+substitutions:
+  LED_STRIP_PIN: GPIO1
+  LED_STRIP_NUM_LEDS: "30"
+  LED_STRIP_CHIPSET: WS2812
+  LED_STRIP_COLOR_ORDER: GRB
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_strip
+    name: "LED Strip"
+    pin: ${LED_STRIP_PIN}
+    chipset: ${LED_STRIP_CHIPSET}
+    num_leds: ${LED_STRIP_NUM_LEDS}
+    channel_colors: ${LED_STRIP_COLOR_ORDER}
+    default_transition_length: 0s
+    restore_mode: ALWAYS_OFF
+    effects:
+      - addressable_rainbow:
+          name: "Rainbow"
+      - addressable_color_wipe:
+          name: "Color Wipe"
+      - addressable_scan:
+          name: "Scan"
+      - addressable_twinkle:
+          name: "Twinkle"
+      - strobe:
+          name: "Strobe"
+
+button:
+  # Steps the strip through red, green, blue, white, then a rainbow so a bad
+  # channel, wrong color order, or dead pixel shows up at a glance
+  - platform: template
+    name: "LED Strip Test"
+    id: led_strip_test_button
+    icon: mdi:led-strip-variant
+    entity_category: diagnostic
+    on_press:
+      - script.execute: led_strip_test
+
+script:
+  - id: led_strip_test
+    mode: restart
+    then:
+      - logger.log: "LED strip test: red"
+      - light.turn_on:
+          id: led_strip
+          brightness: 50%
+          red: 100%
+          green: 0%
+          blue: 0%
+          effect: none
+      - delay: 2s
+      - logger.log: "LED strip test: green"
+      - light.turn_on:
+          id: led_strip
+          red: 0%
+          green: 100%
+          blue: 0%
+      - delay: 2s
+      - logger.log: "LED strip test: blue"
+      - light.turn_on:
+          id: led_strip
+          red: 0%
+          green: 0%
+          blue: 100%
+      - delay: 2s
+      # Low brightness: full white on a long strip can overdraw the 5V rail
+      - logger.log: "LED strip test: white"
+      - light.turn_on:
+          id: led_strip
+          brightness: 25%
+          red: 100%
+          green: 100%
+          blue: 100%
+      - delay: 2s
+      - logger.log: "LED strip test: rainbow"
+      - light.turn_on:
+          id: led_strip
+          brightness: 50%
+          effect: "Rainbow"
+      - delay: 5s
+      - light.turn_off: led_strip
+      - logger.log: "LED strip test: done"
