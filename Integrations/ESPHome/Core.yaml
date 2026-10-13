@@ -49,6 +49,7 @@ esphome:
       then:
         - lambda: |-
             id(led_strip_output)->set_num_leds((uint16_t) id(led_strip_count).state);
+        - script.execute: led_strip_blank_all
         - script.execute:
             id: led_strip_apply_color_order
             order: !lambda "return std::string(id(led_strip_color_order).current_option());"
@@ -571,8 +572,7 @@ light:
     use_psram: false
     default_transition_length: 1s
     restore_mode: RESTORE_DEFAULT_OFF
-    # Re-send the settled frame once, so a frame cut short by a late refill
-    # can't leave stray LEDs lit when nothing else will redraw the strip
+    # Re-send the settled frame once, and clear the whole strip after turn-off
     on_state:
       - script.execute: led_strip_refresh
     effects:
@@ -1054,7 +1054,26 @@ script:
     mode: restart
     then:
       - delay: 1500ms
-      - lambda: "id(led_strip_output)->schedule_show();"
+      - if:
+          condition:
+            light.is_off: led_strip
+          then:
+            - script.execute: led_strip_blank_all
+          else:
+            - lambda: "id(led_strip_output)->schedule_show();"
+
+  - id: led_strip_blank_all
+    then:
+      - lambda: |-
+          // Clear every pixel the buffers cover, so LEDs past the LED Strip Count
+          // (never written otherwise) can't keep colors latched from IO1 noise
+          // during a reboot or an earlier, longer count
+          auto *out = id(led_strip_output);
+          const uint16_t count = out->size();
+          out->set_num_leds(${LED_STRIP_MAX_LEDS});
+          for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
+          out->write_state(id(led_strip));
+          out->set_num_leds(count);
 
   - id: led_strip_music_start
     then:
