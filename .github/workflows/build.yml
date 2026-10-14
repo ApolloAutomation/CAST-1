@@ -30,7 +30,10 @@ jobs:
       # pattern key is everything after the last dash of the filename).
       firmware-names: "1:firmware"
       core-yaml-path: Integrations/ESPHome/Core.yaml
-      esphome-version: stable
+      # Pinned: ESPHome 2026.10's Sendspin library uses a new handshake that the
+      # Music Assistant server we test against rejects, so the player drops out.
+      # Unpin once a 2026.10+ build is confirmed to connect to Music Assistant.
+      esphome-version: "2026.9.1"
       # Bypass check if manually triggered with bypass option
       check-yaml-changes: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.bypass-yaml-check == 'true') }}
       publish-to-pages: true

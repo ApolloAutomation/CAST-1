@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.10.13.2"
+  version: "26.10.14.1"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -20,8 +20,6 @@ esphome:
   name_add_mac_suffix: true
   # network: priority: (WiFi + Ethernet in one firmware) needs 2026.8
   min_version: 2026.8.0
-  platformio_options:
-    board_build.flash_mode: dio
   # List form so package on_boot entries (wizmote.yaml) merge
   on_boot:
     - priority: 800
@@ -237,17 +235,17 @@ esp32_improv:
 esp32:
   variant: ESP32S3
   flash_size: 8MB
+  flash_mode: dio
   cpu_frequency: 240MHz
   framework:
     type: esp-idf
     version: recommended
+    advanced:
+      execute_from_psram: true
     sdkconfig_options:
       CONFIG_ESP32S3_DATA_CACHE_32KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
       CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
-
-      CONFIG_SPIRAM_RODATA: "y"
-      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
 
       # Allocate BT in PSRAM so internal RAM stays free for audio
       CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
