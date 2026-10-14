@@ -47,10 +47,7 @@ jobs:
     uses: esphome/workflows/.github/workflows/build.yml@cc3e76de337dc59bc1cba8da58d963cd23b873f1 # 2026.9.0
     with:
       files: ${{ matrix.yaml }}
-      # Pinned: ESPHome 2026.10's Sendspin library uses a new handshake that the
-      # Music Assistant server we test against rejects, so the player drops out.
-      # Unpin once a 2026.10+ build is confirmed to connect to Music Assistant.
-      esphome-version: "2026.9.1"
+      esphome-version: stable
       combined-name: ${{ matrix.name }}
       release-version: ${{ needs.version.outputs.v }}
 
