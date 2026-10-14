@@ -5,8 +5,6 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    # Changes reach main through beta, so updates land there first
-    target-branch: "beta"
     schedule:
       interval: "monthly"
     commit-message:
