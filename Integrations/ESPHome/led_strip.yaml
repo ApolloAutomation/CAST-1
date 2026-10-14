@@ -1,0 +1,359 @@
+# LED strip on the exposed 5V / GND / IO1 header; included by Core.yaml
+
+esphome:
+  on_boot:
+    # Apply the saved LED strip settings before the light's first write
+    # Must run after the strip and the restored entities set up (800)
+    - priority: 600
+      then:
+        - lambda: |-
+            id(led_strip_output)->set_num_leds((uint16_t) id(led_strip_count).state);
+        - script.execute: led_strip_blank_all
+        - script.execute:
+            id: led_strip_apply_color_order
+            order: !lambda "return std::string(id(led_strip_color_order).current_option());"
+        - script.execute:
+            id: led_strip_apply_chipset
+            chipset: !lambda "return std::string(id(led_strip_chipset).current_option());"
+        - script.execute:
+            id: led_strip_apply_max_brightness
+            percent: !lambda "return id(led_strip_max_brightness).state;"
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_strip
+    output_id: led_strip_output
+    name: "LED Strip"
+    disabled_by_default: true
+    icon: mdi:led-strip-variant
+    pin: GPIO1
+    # Timings and color order are swapped at runtime by the select entities
+    chipset: WS2812
+    channel_colors: GRB
+    num_leds: 300
+    # The rest of the RMT TX memory after the onboard light's 48
+    rmt_symbols: 144
+    # The RMT interrupt refills from these buffers mid-frame; PSRAM reads can
+    # stall it under audio load and cut the frame short
+    use_psram: false
+    default_transition_length: 1s
+    restore_mode: RESTORE_DEFAULT_OFF
+    # Re-send the settled frame once, and clear the whole strip after turn-off
+    on_state:
+      - script.execute: led_strip_refresh
+    effects:
+      - addressable_rainbow:
+          name: "Rainbow"
+      - addressable_color_wipe:
+          name: "Color Wipe"
+      - addressable_scan:
+          name: "Scan"
+      - addressable_twinkle:
+          name: "Twinkle"
+      - addressable_random_twinkle:
+          name: "Random Twinkle"
+      - addressable_fireworks:
+          name: "Fireworks"
+      - addressable_flicker:
+          name: "Flicker"
+      - pulse:
+          name: "Pulse"
+      - strobe:
+          name: "Strobe"
+
+number:
+  - platform: template
+    id: led_strip_count
+    name: "LED Strip Count"
+    disabled_by_default: true
+    icon: mdi:counter
+    entity_category: config
+    mode: box
+    min_value: 1
+    max_value: 300
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 30
+    set_action:
+      - script.execute:
+          id: led_strip_apply_count
+          count: !lambda "return (int) x;"
+
+  # Caps every channel so a long strip can't overdraw the header's 5V rail
+  - platform: template
+    id: led_strip_max_brightness
+    name: "LED Strip Max Brightness"
+    disabled_by_default: true
+    icon: mdi:brightness-percent
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: slider
+    min_value: 10
+    max_value: 100
+    step: 5
+    optimistic: true
+    restore_value: true
+    initial_value: 50
+    set_action:
+      - script.execute:
+          id: led_strip_apply_max_brightness
+          percent: !lambda "return x;"
+
+select:
+  - platform: template
+    id: led_strip_color_order
+    name: "LED Strip Color Order"
+    disabled_by_default: true
+    icon: mdi:palette
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "GRB"
+      - "RGB"
+      - "BRG"
+      - "RBG"
+      - "GBR"
+      - "BGR"
+    initial_option: "GRB"
+    set_action:
+      - script.execute:
+          id: led_strip_apply_color_order
+          order: !lambda "return std::string(x);"
+
+  - platform: template
+    id: led_strip_chipset
+    name: "LED Strip Chipset"
+    disabled_by_default: true
+    icon: mdi:chip
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "WS2812"
+      - "SK6812"
+      - "WS2811"
+      - "APA106"
+      - "SM16703"
+    initial_option: "WS2812"
+    set_action:
+      - script.execute:
+          id: led_strip_apply_chipset
+          chipset: !lambda "return std::string(x);"
+
+  - platform: template
+    id: led_strip_music_effect
+    name: "LED Strip Music Effect"
+    disabled_by_default: true
+    icon: mdi:music-circle
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "Rainbow"
+      - "Color Wipe"
+      - "Scan"
+      - "Twinkle"
+      - "Random Twinkle"
+      - "Fireworks"
+      - "Flicker"
+      - "Pulse"
+    initial_option: "Rainbow"
+
+switch:
+  # Music Mode: the strip turns on with the Music Effect while audio plays and
+  # off once playback has stopped for 10s
+  - platform: template
+    id: led_strip_music_mode
+    name: "LED Strip Music Mode"
+    disabled_by_default: true
+    icon: mdi:music-note
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - if:
+          condition:
+            binary_sensor.is_on: led_strip_music_playing
+          then:
+            - script.execute: led_strip_music_start
+    on_turn_off:
+      - if:
+          condition:
+            binary_sensor.is_on: led_strip_music_playing
+          then:
+            - light.turn_off: led_strip
+
+binary_sensor:
+  - platform: template
+    id: led_strip_music_playing
+    internal: true
+    # Sendspin's player and the HTTP source report stop at once; the main
+    # player only goes idle ~10s later, once its buffers drain
+    lambda: |-
+      return id(sendspin_group_media_player).state == media_player::MEDIA_PLAYER_STATE_PLAYING ||
+             id(http_media_source)->get_state() == media_source::MediaSourceState::PLAYING;
+    filters:
+      # Bridge track changes and rebuffering so the strip doesn't blink off
+      - delayed_off: 3s
+    on_press:
+      - if:
+          condition:
+            switch.is_on: led_strip_music_mode
+          then:
+            - script.execute: led_strip_music_start
+    on_release:
+      - if:
+          condition:
+            switch.is_on: led_strip_music_mode
+          then:
+            - light.turn_off: led_strip
+
+button:
+  # Steps the strip through red, green, blue, white, then a rainbow so a bad
+  # channel, wrong color order, or dead pixel shows up at a glance
+  - platform: template
+    id: led_strip_test_button
+    name: "LED Strip Test"
+    disabled_by_default: true
+    icon: mdi:led-strip-variant
+    entity_category: diagnostic
+    on_press:
+      - script.execute: led_strip_test
+
+script:
+  - id: led_strip_apply_count
+    mode: queued
+    parameters:
+      count: int
+    then:
+      - lambda: |-
+          auto *out = id(led_strip_output);
+          // Blank every pixel the buffers cover, so LEDs past a lowered count go dark
+          out->set_num_leds(300);
+          for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
+          out->write_state(id(led_strip));
+          out->set_num_leds((uint16_t) count);
+          out->clear_effect_data();
+          // Repaint the current color at the new length (effects repaint themselves)
+          out->update_state(id(led_strip));
+          ESP_LOGI("led_strip", "Driving %d LEDs", count);
+
+  - id: led_strip_apply_max_brightness
+    parameters:
+      percent: float
+    then:
+      - lambda: |-
+          const float scale = percent / 100.0f;
+          id(led_strip_output)->set_correction(scale, scale, scale);
+          id(led_strip_output)->update_state(id(led_strip));
+
+  - id: led_strip_apply_color_order
+    parameters:
+      order: string
+    then:
+      - lambda: |-
+          // Each letter's position is that color's byte offset on the wire;
+          // all options are 3-byte, so the allocated buffers still fit
+          id(led_strip_output)->set_channel_colors(light::ChannelColors{
+              (uint8_t) order.find('R'), (uint8_t) order.find('G'), (uint8_t) order.find('B'),
+              light::ChannelColors::NO_WHITE});
+          id(led_strip_output)->update_state(id(led_strip));
+
+  - id: led_strip_apply_chipset
+    parameters:
+      chipset: string
+    then:
+      - lambda: |-
+          // Bit timings in ns, matching ESPHome's esp32_rmt_led_strip chipset table
+          auto *out = id(led_strip_output);
+          if (chipset == "SK6812") {
+            out->set_led_params(300, 900, 600, 600, 0, 0);
+          } else if (chipset == "WS2811") {
+            out->set_led_params(300, 1090, 1090, 320, 0, 300000);
+          } else if (chipset == "APA106") {
+            out->set_led_params(350, 1360, 1360, 350, 0, 0);
+          } else if (chipset == "SM16703") {
+            out->set_led_params(300, 900, 900, 300, 0, 0);
+          } else {
+            out->set_led_params(400, 1000, 1000, 400, 0, 0);
+          }
+          out->schedule_show();
+
+  - id: led_strip_refresh
+    mode: restart
+    then:
+      - delay: 1500ms
+      - if:
+          condition:
+            light.is_off: led_strip
+          then:
+            - script.execute: led_strip_blank_all
+          else:
+            - lambda: "id(led_strip_output)->schedule_show();"
+
+  - id: led_strip_blank_all
+    then:
+      - lambda: |-
+          // Clear every pixel the buffers cover, so LEDs past the LED Strip Count
+          // (never written otherwise) can't keep colors latched from IO1 noise
+          // during a reboot or an earlier, longer count
+          auto *out = id(led_strip_output);
+          const uint16_t count = out->size();
+          out->set_num_leds(300);
+          for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
+          out->write_state(id(led_strip));
+          out->set_num_leds(count);
+
+  - id: led_strip_music_start
+    then:
+      - light.turn_on:
+          id: led_strip
+          effect: !lambda "return std::string(id(led_strip_music_effect).current_option());"
+
+  - id: led_strip_test
+    mode: restart
+    then:
+      - logger.log: "LED strip test: red"
+      - light.control:
+          id: led_strip
+          effect: none
+      - light.turn_on:
+          id: led_strip
+          transition_length: 0s
+          brightness: 100%
+          red: 100%
+          green: 0%
+          blue: 0%
+      - delay: 2s
+      - logger.log: "LED strip test: green"
+      - light.turn_on:
+          id: led_strip
+          transition_length: 0s
+          red: 0%
+          green: 100%
+          blue: 0%
+      - delay: 2s
+      - logger.log: "LED strip test: blue"
+      - light.turn_on:
+          id: led_strip
+          transition_length: 0s
+          red: 0%
+          green: 0%
+          blue: 100%
+      - delay: 2s
+      - logger.log: "LED strip test: white"
+      - light.turn_on:
+          id: led_strip
+          transition_length: 0s
+          red: 100%
+          green: 100%
+          blue: 100%
+      - delay: 2s
+      - logger.log: "LED strip test: rainbow"
+      - light.turn_on:
+          id: led_strip
+          effect: "Rainbow"
+      - delay: 5s
+      - light.turn_off: led_strip
+      - logger.log: "LED strip test: done"

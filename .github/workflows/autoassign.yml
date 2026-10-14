@@ -17,5 +17,5 @@ jobs:
   auto-assign:
     uses: ApolloAutomation/Workflows/.github/workflows/autoassign.yml@main
     with:
-      assignees: bharvey88
+      assignees: TrevorSchirmer
       num-of-assignees: 1
