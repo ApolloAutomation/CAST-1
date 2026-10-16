@@ -1,7 +1,8 @@
 # Apollo CAST-1
 
-<!-- Brandon: drop CAST_Card.png here, then update the path below -->
-![Apollo CAST-1](https://placehold.co/800x400?text=CAST-1)
+<p align="center">
+  <img src="CAST_Card.jpg" alt="Apollo CAST-1" width="600">
+</p>
 
 Easily make your speakers smart and cast to multiple devices using Music Assistant and Sendspin!
 
