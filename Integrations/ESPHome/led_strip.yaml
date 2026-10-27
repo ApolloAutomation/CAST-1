@@ -75,7 +75,7 @@ light:
           name: "Strobe"
 
       # Effect A and Effect B run the pattern their Pattern select picks, at
-      # their own Speed and Intensity. Partition lights in the device YAML can
+      # their own Speed. Partition lights in the device YAML can
       # list the same two entries (see the README)
       - addressable_lambda:
           name: "Effect A"
@@ -91,7 +91,7 @@ light:
 globals:
   # Renders Effect A (slot 0) and Effect B (slot 1) for any addressable light,
   # so the LED Strip and partition lights share one copy and one set of
-  # Pattern / Speed / Intensity entities. A globals initializer is plain C++,
+  # Pattern / Speed entities. A globals initializer is plain C++,
   # so it names the entities directly instead of through id()
   - id: led_strip_slot_effect
     type: std::function<void(light::AddressableLight &, Color, bool, int)>
@@ -123,10 +123,7 @@ globals:
                                             : static_cast<select::Select *>(led_strip_effect_a_pattern);
         number::Number *speed_num = slot == 1 ? static_cast<number::Number *>(led_strip_effect_b_speed)
                                               : static_cast<number::Number *>(led_strip_effect_a_speed);
-        number::Number *intensity_num = slot == 1 ? static_cast<number::Number *>(led_strip_effect_b_intensity)
-                                                  : static_cast<number::Number *>(led_strip_effect_a_intensity);
         const float speed = clamp(speed_num->state, 1.0f, 100.0f);
-        const float intensity = clamp(intensity_num->state / 100.0f, 0.0f, 1.0f);
         // Speed 1-100 on a log curve: 1 = 1000 ms, 50 = 182 ms, 100 = 32 ms,
         // so the fastest step lands on two ~16 ms main-loop passes
         const uint32_t period = (uint32_t) (1000.0f * powf(0.032f, (speed - 1.0f) / 99.0f));
@@ -139,18 +136,17 @@ globals:
         }
 
         if (pattern->active_index().value_or(0) == 1) {
-          // Strobe: one flash every 2 x period, lit for the Intensity share of it
+          // Strobe: on for one period, off for the next
           const uint32_t cycle = period * 2;
           if (now - st.cycle_start >= cycle) st.cycle_start = now - (now - st.cycle_start) % cycle;
-          const uint32_t on_ms = (uint32_t) (cycle * clamp(intensity, 0.05f, 0.95f));
-          it.all() = (now - st.cycle_start) < on_ms ? color : Color::BLACK;
+          it.all() = (now - st.cycle_start) < period ? color : Color::BLACK;
         } else {
           // Flicker: every period the light picks a new random level, no lower
-          // than 1 - Intensity, and eases toward it within a few frames
+          // than 30%, and eases toward it within a few frames
           const int32_t late = (int32_t) (now - st.next_ms);
           // A raised Speed pulls in a change that was scheduled further out
           if (late >= 0 || -late > (int32_t) period) {
-            st.target = 1.0f - intensity * random_float();
+            st.target = 1.0f - 0.7f * random_float();
             st.next_ms = (late >= 0 && late < (int32_t) period) ? st.next_ms + period : now + period;
           }
           st.level += (st.target - st.level) * 0.6f;
@@ -198,25 +194,6 @@ number:
     restore_value: true
     initial_value: 50
 
-  # Flicker: how far the light can dip (0 = steady); Strobe: share of each
-  # flash the strip is lit
-  - platform: template
-    id: led_strip_effect_a_intensity
-    name: "LED Strip Effect A Intensity"
-    icon: mdi:tune-vertical
-    entity_category: config
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 13
-    unit_of_measurement: "%"
-    mode: slider
-    min_value: 0
-    max_value: 100
-    step: 1
-    optimistic: true
-    restore_value: true
-    initial_value: 70
-
   - platform: template
     id: led_strip_effect_b_speed
     name: "LED Strip Effect B Speed"
@@ -232,23 +209,6 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 80
-
-  - platform: template
-    id: led_strip_effect_b_intensity
-    name: "LED Strip Effect B Intensity"
-    icon: mdi:tune-vertical
-    entity_category: config
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 16
-    unit_of_measurement: "%"
-    mode: slider
-    min_value: 0
-    max_value: 100
-    step: 1
-    optimistic: true
-    restore_value: true
-    initial_value: 50
 
 select:
   - platform: template

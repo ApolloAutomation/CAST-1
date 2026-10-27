@@ -45,13 +45,13 @@ substitutions:
 The rest of the strip's settings live in Home Assistant and under **External LED Strip** on the device's web page:
 
 - **Chipset**, **Color Order** and **Max Brightness** describe your strip.
-- **Effect A** and **Effect B** are two effect slots. Each has a **Pattern** (Flicker or Strobe), a **Speed** (1 = one change per second, 100 = one every 32 ms, on a log curve) and an **Intensity** (Flicker: how deep it dips; Strobe: how much of each flash is lit). Changes apply live while the effect runs.
+- **Effect A** and **Effect B** are two effect slots. Each has a **Pattern** (Flicker or Strobe) and a **Speed** (1 = one change per second, 100 = one every 32 ms, on a log curve). Flicker dips to random levels between full and 30% brightness; Strobe is on for one period and off for the next. Changes apply live while the effect runs.
 
 In automations, set the pattern and speed with `select.select_option` and `number.set_value`, then call `light.turn_on` with `effect: "Effect A"` (add `transition: 0` for an instant start).
 
 ### Splitting the strip into segments
 
-To turn parts of the strip on and off on their own, add [partition lights](https://esphome.io/components/light/partition/) to your device YAML in ESPHome Device Builder and install it. Each partition becomes its own light in Home Assistant, with its own on/off, color, brightness and effect. List Effect A and Effect B on a partition to use the shared Pattern, Speed and Intensity settings.
+To turn parts of the strip on and off on their own, add [partition lights](https://esphome.io/components/light/partition/) to your device YAML in ESPHome Device Builder and install it. Each partition becomes its own light in Home Assistant, with its own on/off, color, brightness and effect. List Effect A and Effect B on a partition to use the shared Pattern and Speed settings.
 
 For 21 LEDs in 3 segments of 7 (`to` is inclusive, and the first LED is 0):
 
