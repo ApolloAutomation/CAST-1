@@ -87,11 +87,16 @@ light:
             const uint32_t now = millis();
 
             const bool slot_b = strcmp(id(led_strip).get_effect_name().c_str(), "Effect B") == 0;
-            auto *pattern = slot_b ? id(led_strip_effect_b_pattern) : id(led_strip_effect_a_pattern);
-            const float speed = clamp(slot_b ? id(led_strip_effect_b_speed).state
-                                             : id(led_strip_effect_a_speed).state, 1.0f, 100.0f);
-            const float intensity = clamp((slot_b ? id(led_strip_effect_b_intensity).state
-                                                  : id(led_strip_effect_a_intensity).state) / 100.0f, 0.0f, 1.0f);
+            // Each template select is its own type (it carries its initial option),
+            // so pick through the shared base classes
+            select::Select *pattern = slot_b ? static_cast<select::Select *>(id(led_strip_effect_b_pattern))
+                                             : static_cast<select::Select *>(id(led_strip_effect_a_pattern));
+            number::Number *speed_num = slot_b ? static_cast<number::Number *>(id(led_strip_effect_b_speed))
+                                               : static_cast<number::Number *>(id(led_strip_effect_a_speed));
+            number::Number *intensity_num = slot_b ? static_cast<number::Number *>(id(led_strip_effect_b_intensity))
+                                                   : static_cast<number::Number *>(id(led_strip_effect_a_intensity));
+            const float speed = clamp(speed_num->state, 1.0f, 100.0f);
+            const float intensity = clamp(intensity_num->state / 100.0f, 0.0f, 1.0f);
             // Speed 1-100 on a log curve: 1 = 1000 ms, 50 = 176 ms, 100 = 30 ms
             const uint32_t period = (uint32_t) (1000.0f * powf(0.03f, (speed - 1.0f) / 99.0f));
 
