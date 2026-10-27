@@ -1,13 +1,16 @@
 # LED strip on the exposed 5V / GND / IO1 header; included by Core.yaml
 
+substitutions:
+  # How many LEDs the strip has; set led_strip_num_leds in the device YAML's
+  # substitutions to override it (partitions must fit inside it)
+  led_strip_num_leds: "30"
+
 esphome:
   on_boot:
     # Apply the saved LED strip settings before the light's first write
     # Must run after the strip and the restored entities set up (800)
     - priority: 600
       then:
-        - lambda: |-
-            id(led_strip_output)->set_num_leds((uint16_t) id(led_strip_count).state);
         - script.execute: led_strip_blank_all
         - script.execute:
             id: led_strip_apply_color_order
@@ -39,7 +42,7 @@ light:
     # Timings and color order are swapped at runtime by the select entities
     chipset: WS2812
     channel_colors: GRB
-    num_leds: 300
+    num_leds: ${led_strip_num_leds}
     # The rest of the RMT TX memory after the onboard light's 48
     rmt_symbols: 144
     # The RMT interrupt refills from these buffers mid-frame; PSRAM reads can
@@ -72,126 +75,90 @@ light:
           name: "Strobe"
 
       # Effect A and Effect B run the pattern their Pattern select picks, at
-      # their own Speed and Intensity, on the segments whose switch is on
+      # their own Speed and Intensity. Partition lights in the device YAML can
+      # list the same two entries (see the README)
       - addressable_lambda:
           name: "Effect A"
-          # About one frame per main-loop pass (~16 ms); the lambda keeps its
+          # About one frame per main-loop pass (~16 ms); the helper keeps its
           # own clock, so this only caps how often the strip is re-sent
           update_interval: 15ms
-          lambda: &led_strip_slot_effect |-
-            // Effect A and Effect B share this body; each copy keeps its own statics
-            static float level[8];
-            static float target[8];
-            static uint32_t next_ms = 0;
-            static uint32_t cycle_start = 0;
-            const uint32_t now = millis();
-
-            const bool slot_b = strcmp(id(led_strip).get_effect_name().c_str(), "Effect B") == 0;
-            // Each template select is its own type (it carries its initial option),
-            // so pick through the shared base classes
-            select::Select *pattern = slot_b ? static_cast<select::Select *>(id(led_strip_effect_b_pattern))
-                                             : static_cast<select::Select *>(id(led_strip_effect_a_pattern));
-            number::Number *speed_num = slot_b ? static_cast<number::Number *>(id(led_strip_effect_b_speed))
-                                               : static_cast<number::Number *>(id(led_strip_effect_a_speed));
-            number::Number *intensity_num = slot_b ? static_cast<number::Number *>(id(led_strip_effect_b_intensity))
-                                                   : static_cast<number::Number *>(id(led_strip_effect_a_intensity));
-            const float speed = clamp(speed_num->state, 1.0f, 100.0f);
-            const float intensity = clamp(intensity_num->state / 100.0f, 0.0f, 1.0f);
-            // Speed 1-100 on a log curve: 1 = 1000 ms, 50 = 176 ms, 100 = 30 ms
-            const uint32_t period = (uint32_t) (1000.0f * powf(0.03f, (speed - 1.0f) / 99.0f));
-
-            if (initial_run) {
-              for (auto &l : level) l = 1.0f;
-              for (auto &t : target) t = 1.0f;
-              next_ms = now;
-              cycle_start = now;
-            }
-
-            // Split the strip into segments; the last one takes the leftover LEDs
-            const int32_t n = it.size();
-            if (n <= 0) return;
-            const int32_t segs = std::max<int32_t>(1, std::min<int32_t>((int32_t) id(led_strip_segments).state,
-                                                                        std::min<int32_t>(8, n)));
-            const int32_t base = n / segs;
-            const bool seg_on[8] = {id(led_strip_segment_1).state, id(led_strip_segment_2).state,
-                                    id(led_strip_segment_3).state, id(led_strip_segment_4).state,
-                                    id(led_strip_segment_5).state, id(led_strip_segment_6).state,
-                                    id(led_strip_segment_7).state, id(led_strip_segment_8).state};
-
-            if (pattern->active_index().value_or(0) == 1) {
-              // Strobe: one flash every 2 x period, lit for the Intensity share of it
-              const uint32_t cycle = period * 2;
-              if (now - cycle_start >= cycle) cycle_start = now - (now - cycle_start) % cycle;
-              const uint32_t on_ms = (uint32_t) (cycle * clamp(intensity, 0.05f, 0.95f));
-              const Color c = (now - cycle_start) < on_ms ? current_color : Color::BLACK;
-              for (int32_t s = 0; s < segs; s++) {
-                const int32_t from = s * base;
-                const int32_t to = (s == segs - 1) ? n : from + base;
-                it.range(from, to) = seg_on[s] ? c : Color::BLACK;
-              }
-            } else {
-              // Flicker: every period each segment picks a new random level, no
-              // lower than 1 - Intensity, and eases toward it within a few frames
-              const int32_t late = (int32_t) (now - next_ms);
-              // A raised Speed pulls in a change that was scheduled further out
-              if (late >= 0 || -late > (int32_t) period) {
-                for (int32_t s = 0; s < segs; s++) target[s] = 1.0f - intensity * random_float();
-                next_ms = (late >= 0 && late < (int32_t) period) ? next_ms + period : now + period;
-              }
-              for (int32_t s = 0; s < segs; s++) {
-                level[s] += (target[s] - level[s]) * 0.6f;
-                const int32_t from = s * base;
-                const int32_t to = (s == segs - 1) ? n : from + base;
-                it.range(from, to) = seg_on[s] ? current_color * (uint8_t) (level[s] * 255.0f) : Color::BLACK;
-              }
-            }
+          lambda: "id(led_strip_slot_effect)(it, current_color, initial_run, 0);"
       - addressable_lambda:
           name: "Effect B"
           update_interval: 15ms
-          lambda: *led_strip_slot_effect
+          lambda: "id(led_strip_slot_effect)(it, current_color, initial_run, 1);"
 
-      # Solid color on each segment whose switch is on; a plain color paints
-      # every LED, so the segment switches move the strip onto this effect
-      - addressable_lambda:
-          name: "Segments"
-          update_interval: 50ms
-          lambda: |-
-            const int32_t n = it.size();
-            if (n <= 0) return;
-            const int32_t segs = std::max<int32_t>(1, std::min<int32_t>((int32_t) id(led_strip_segments).state,
-                                                                        std::min<int32_t>(8, n)));
-            const int32_t base = n / segs;
-            const bool seg_on[8] = {id(led_strip_segment_1).state, id(led_strip_segment_2).state,
-                                    id(led_strip_segment_3).state, id(led_strip_segment_4).state,
-                                    id(led_strip_segment_5).state, id(led_strip_segment_6).state,
-                                    id(led_strip_segment_7).state, id(led_strip_segment_8).state};
-            for (int32_t s = 0; s < segs; s++) {
-              const int32_t from = s * base;
-              const int32_t to = (s == segs - 1) ? n : from + base;
-              it.range(from, to) = seg_on[s] ? current_color : Color::BLACK;
-            }
+globals:
+  # Renders Effect A (slot 0) and Effect B (slot 1) for any addressable light,
+  # so the LED Strip and partition lights share one copy and one set of
+  # Pattern / Speed / Intensity entities. A globals initializer is plain C++,
+  # so it names the entities directly instead of through id()
+  - id: led_strip_slot_effect
+    type: std::function<void(light::AddressableLight &, Color, bool, int)>
+    restore_value: no
+    initial_value: |-
+      [](light::AddressableLight &it, Color color, bool initial_run, int slot) {
+        struct SlotState {
+          float level;
+          float target;
+          uint32_t next_ms;
+          uint32_t cycle_start;
+        };
+        // One state per light, since a light runs one effect at a time
+        static const light::AddressableLight *owners[16] = {};
+        static SlotState states[16];
+        int i = 0;
+        while (i < 16 && owners[i] != nullptr && owners[i] != &it) i++;
+        if (i == 16) return;
+        if (owners[i] == nullptr) {
+          owners[i] = &it;
+          initial_run = true;
+        }
+        SlotState &st = states[i];
+        const uint32_t now = millis();
+
+        // Each template select is its own type (it carries its initial option),
+        // so pick through the shared base classes
+        select::Select *pattern = slot == 1 ? static_cast<select::Select *>(led_strip_effect_b_pattern)
+                                            : static_cast<select::Select *>(led_strip_effect_a_pattern);
+        number::Number *speed_num = slot == 1 ? static_cast<number::Number *>(led_strip_effect_b_speed)
+                                              : static_cast<number::Number *>(led_strip_effect_a_speed);
+        number::Number *intensity_num = slot == 1 ? static_cast<number::Number *>(led_strip_effect_b_intensity)
+                                                  : static_cast<number::Number *>(led_strip_effect_a_intensity);
+        const float speed = clamp(speed_num->state, 1.0f, 100.0f);
+        const float intensity = clamp(intensity_num->state / 100.0f, 0.0f, 1.0f);
+        // Speed 1-100 on a log curve: 1 = 1000 ms, 50 = 182 ms, 100 = 32 ms,
+        // so the fastest step lands on two ~16 ms main-loop passes
+        const uint32_t period = (uint32_t) (1000.0f * powf(0.032f, (speed - 1.0f) / 99.0f));
+
+        if (initial_run) {
+          st.level = 1.0f;
+          st.target = 1.0f;
+          st.next_ms = now;
+          st.cycle_start = now;
+        }
+
+        if (pattern->active_index().value_or(0) == 1) {
+          // Strobe: one flash every 2 x period, lit for the Intensity share of it
+          const uint32_t cycle = period * 2;
+          if (now - st.cycle_start >= cycle) st.cycle_start = now - (now - st.cycle_start) % cycle;
+          const uint32_t on_ms = (uint32_t) (cycle * clamp(intensity, 0.05f, 0.95f));
+          it.all() = (now - st.cycle_start) < on_ms ? color : Color::BLACK;
+        } else {
+          // Flicker: every period the light picks a new random level, no lower
+          // than 1 - Intensity, and eases toward it within a few frames
+          const int32_t late = (int32_t) (now - st.next_ms);
+          // A raised Speed pulls in a change that was scheduled further out
+          if (late >= 0 || -late > (int32_t) period) {
+            st.target = 1.0f - intensity * random_float();
+            st.next_ms = (late >= 0 && late < (int32_t) period) ? st.next_ms + period : now + period;
+          }
+          st.level += (st.target - st.level) * 0.6f;
+          it.all() = color * (uint8_t) (st.level * 255.0f);
+        }
+      }
 
 number:
-  - platform: template
-    id: led_strip_count
-    name: "LED Strip Count"
-    icon: mdi:counter
-    entity_category: config
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 20
-    mode: box
-    min_value: 1
-    max_value: 300
-    step: 1
-    optimistic: true
-    restore_value: true
-    initial_value: 30
-    set_action:
-      - script.execute:
-          id: led_strip_apply_count
-          count: !lambda "return (int) x;"
-
   # Caps every channel so a long strip can't overdraw the header's 5V rail
   - platform: template
     id: led_strip_max_brightness
@@ -214,27 +181,7 @@ number:
           id: led_strip_apply_max_brightness
           percent: !lambda "return x;"
 
-  # How many equal segments the strip splits into; Segment switches past this
-  # count do nothing
-  - platform: template
-    id: led_strip_segments
-    name: "LED Strip Segments"
-    icon: mdi:view-split-vertical
-    entity_category: config
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 2
-    mode: box
-    min_value: 1
-    max_value: 8
-    step: 1
-    optimistic: true
-    restore_value: true
-    initial_value: 1
-    on_value:
-      - script.execute: led_strip_segments_changed
-
-  # Speed 1-100 maps on a log curve from 1 s (1) to 30 ms (100) between changes
+  # Speed 1-100 maps on a log curve from 1 s (1) to 32 ms (100) between changes
   - platform: template
     id: led_strip_effect_a_speed
     name: "LED Strip Effect A Speed"
@@ -251,7 +198,7 @@ number:
     restore_value: true
     initial_value: 50
 
-  # Flicker: how far a segment can dip (0 = steady); Strobe: share of each
+  # Flicker: how far the light can dip (0 = steady); Strobe: share of each
   # flash the strip is lit
   - platform: template
     id: led_strip_effect_a_intensity
@@ -427,120 +374,6 @@ switch:
           then:
             - light.turn_off: led_strip
 
-  # Segment switches: Effect A, Effect B and Segments leave a segment dark
-  # while its switch is off
-  - platform: template
-    id: led_strip_segment_1
-    name: "LED Strip Segment 1"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 3
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_2
-    name: "LED Strip Segment 2"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 4
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_3
-    name: "LED Strip Segment 3"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 5
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_4
-    name: "LED Strip Segment 4"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 6
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_5
-    name: "LED Strip Segment 5"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 7
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_6
-    name: "LED Strip Segment 6"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 8
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_7
-    name: "LED Strip Segment 7"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 9
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
-  - platform: template
-    id: led_strip_segment_8
-    name: "LED Strip Segment 8"
-    icon: mdi:led-strip
-    web_server:
-      sorting_group_id: sg_led_strip
-      sorting_weight: 10
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    on_turn_on:
-      - script.execute: led_strip_segments_changed
-    on_turn_off:
-      - script.execute: led_strip_segments_changed
-
 binary_sensor:
   - platform: template
     id: led_strip_music_playing
@@ -581,23 +414,6 @@ button:
       - script.execute: led_strip_test
 
 script:
-  - id: led_strip_apply_count
-    mode: queued
-    parameters:
-      count: int
-    then:
-      - lambda: |-
-          auto *out = id(led_strip_output);
-          // Blank every pixel the buffers cover, so LEDs past a lowered count go dark
-          out->set_num_leds(300);
-          for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
-          out->write_state(id(led_strip));
-          out->set_num_leds((uint16_t) count);
-          out->clear_effect_data();
-          // Repaint the current color at the new length (effects repaint themselves)
-          out->update_state(id(led_strip));
-          ESP_LOGI("led_strip", "Driving %d LEDs", count);
-
   - id: led_strip_apply_max_brightness
     parameters:
       percent: float
@@ -654,40 +470,11 @@ script:
   - id: led_strip_blank_all
     then:
       - lambda: |-
-          // Clear every pixel the buffers cover, so LEDs past the LED Strip Count
-          // (never written otherwise) can't keep colors latched from IO1 noise
-          // during a reboot or an earlier, longer count
+          // Clear every pixel, so none keeps a color latched from IO1 noise
+          // during a reboot
           auto *out = id(led_strip_output);
-          const uint16_t count = out->size();
-          out->set_num_leds(300);
           for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
           out->write_state(id(led_strip));
-          out->set_num_leds(count);
-
-  # A plain color paints every LED, so when a segment is switched off while the
-  # strip shows one, move the strip onto the Segments effect to mask it
-  - id: led_strip_segments_changed
-    mode: queued
-    then:
-      - if:
-          condition:
-            and:
-              - light.is_on: led_strip
-              - lambda: |-
-                  if (strcmp(id(led_strip).get_effect_name().c_str(), "None") != 0) return false;
-                  const int32_t segs = std::min<int32_t>((int32_t) id(led_strip_segments).state, 8);
-                  const bool seg_on[8] = {id(led_strip_segment_1).state, id(led_strip_segment_2).state,
-                                          id(led_strip_segment_3).state, id(led_strip_segment_4).state,
-                                          id(led_strip_segment_5).state, id(led_strip_segment_6).state,
-                                          id(led_strip_segment_7).state, id(led_strip_segment_8).state};
-                  for (int32_t s = 0; s < segs; s++) {
-                    if (!seg_on[s]) return true;
-                  }
-                  return false;
-          then:
-            - light.turn_on:
-                id: led_strip
-                effect: "Segments"
 
   - id: led_strip_music_start
     then:

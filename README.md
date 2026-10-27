@@ -35,14 +35,63 @@ Configure every button without leaving Home Assistant using the [CAST-1 WizMote 
 
 ## External LED Strip
 
-The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). Every setting lives in Home Assistant and under **External LED Strip** on the device's web page — no YAML edits needed.
+The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). Set how many LEDs it has in your device YAML in ESPHome Device Builder (the default is 30), then install:
 
-- **LED Strip Count** and **LED Strip Segments** set how many LEDs you have and how many equal segments they split into (1–8). Leftover LEDs go to the last segment, so 22 LEDs in 3 segments are 7 / 7 / 8.
-- **LED Strip Segment 1–8** switch each segment on or off. Switches past the Segments count do nothing.
-- **Effect A** and **Effect B** are two effect slots on the LED Strip light. Each has a **Pattern** (Flicker or Strobe), a **Speed** (1 = one change per second, 100 = one every 30 ms, on a log curve) and an **Intensity** (Flicker: how deep it dips; Strobe: how much of each flash is lit). Changes apply live while the effect runs.
-- The **Segments** effect shows a solid color on the segments that are on. Switching a segment off while the strip shows a plain color moves it onto this effect automatically.
+```yaml
+substitutions:
+  led_strip_num_leds: "21"
+```
 
-In automations, set the pattern, speed and segments with `select.select_option`, `number.set_value` and `switch.turn_on` / `switch.turn_off`, then call `light.turn_on` with `effect: "Effect A"` (add `transition: 0` for an instant start).
+The rest of the strip's settings live in Home Assistant and under **External LED Strip** on the device's web page:
+
+- **Chipset**, **Color Order** and **Max Brightness** describe your strip.
+- **Effect A** and **Effect B** are two effect slots. Each has a **Pattern** (Flicker or Strobe), a **Speed** (1 = one change per second, 100 = one every 32 ms, on a log curve) and an **Intensity** (Flicker: how deep it dips; Strobe: how much of each flash is lit). Changes apply live while the effect runs.
+
+In automations, set the pattern and speed with `select.select_option` and `number.set_value`, then call `light.turn_on` with `effect: "Effect A"` (add `transition: 0` for an instant start).
+
+### Splitting the strip into segments
+
+To turn parts of the strip on and off on their own, add [partition lights](https://esphome.io/components/light/partition/) to your device YAML in ESPHome Device Builder and install it. Each partition becomes its own light in Home Assistant, with its own on/off, color, brightness and effect. List Effect A and Effect B on a partition to use the shared Pattern, Speed and Intensity settings.
+
+For 21 LEDs in 3 segments of 7 (`to` is inclusive, and the first LED is 0):
+
+```yaml
+light:
+  - platform: partition
+    name: "LED Segment 1"
+    segments:
+      - id: led_strip
+        from: 0
+        to: 6
+    default_transition_length: 0s
+    effects: &led_segment_effects
+      - addressable_lambda:
+          name: "Effect A"
+          update_interval: 15ms
+          lambda: "id(led_strip_slot_effect)(it, current_color, initial_run, 0);"
+      - addressable_lambda:
+          name: "Effect B"
+          update_interval: 15ms
+          lambda: "id(led_strip_slot_effect)(it, current_color, initial_run, 1);"
+  - platform: partition
+    name: "LED Segment 2"
+    segments:
+      - id: led_strip
+        from: 7
+        to: 13
+    default_transition_length: 0s
+    effects: *led_segment_effects
+  - platform: partition
+    name: "LED Segment 3"
+    segments:
+      - id: led_strip
+        from: 14
+        to: 20
+    default_transition_length: 0s
+    effects: *led_segment_effects
+```
+
+Every partition has to fit inside `led_strip_num_leds`; the install fails if one doesn't. Partitions share the strip's pixels, so control either the partitions or the main **LED Strip** light, not both at once — turning the main light off clears the whole strip.
 
 > [!WARNING]
 > **Photosensitivity:** Strobe flashes faster than 3 times per second from about Speed 50 up, and reaches about 16 flashes per second at Speed 100. Flashing in this range can trigger seizures in people with photosensitive epilepsy.
