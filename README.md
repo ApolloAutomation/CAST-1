@@ -45,12 +45,18 @@ substitutions:
 
 ## External LED Strip
 
-The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). Set how many LEDs it has in your device YAML in ESPHome Device Builder (the default is 30), then install:
+The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). The strip is opt-in: add `led_strip.yaml` to the packages in your device YAML in ESPHome Device Builder, set how many LEDs it has (the default is 30), then install:
 
 ```yaml
 substitutions:
   led_strip_num_leds: "21"
+
+packages:
+  cast_1: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1.yaml@main
+  led_strip: github://ApolloAutomation/CAST-1/Integrations/ESPHome/led_strip.yaml@main
 ```
+
+Remove the `led_strip` line to drop the strip again. Any partitions you added have to go with it, since they use the strip.
 
 The rest of the strip's settings live in Home Assistant and under **External LED Strip** on the device's web page:
 

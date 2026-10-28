@@ -13,7 +13,8 @@ substitutions:
 
 packages:
   wizmote: !include wizmote.yaml
-  led_strip: !include led_strip.yaml
+  # The external LED strip (led_strip.yaml) is opt-in: add it to the
+  # package files in the device YAML
 
 esphome:
   friendly_name: Apollo CAST-1
