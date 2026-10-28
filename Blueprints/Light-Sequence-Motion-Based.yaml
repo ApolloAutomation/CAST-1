@@ -1,0 +1,903 @@
+blueprint:
+  name: Light Sequence (Motion-Based)
+  description: >-
+    Lights a path in stages when a motion sensor (PIR) sees a visitor. With
+    one sensor the whole show runs on timers: motion starts it, each stage
+    turns on a set time after the one before, then the finale plays and all
+    the lights go to the resting state.
+
+
+    With more sensors along the path, any stage or the finale can wait for
+    its own sensor instead of a timer. If the visitor doesn't reach that
+    sensor in time, the lit lights go to the resting state early.
+
+
+    With more than one sensor, sequences only start when the visitor walks
+    toward the door: someone setting off the door-side sensors first, on the
+    way out, doesn't start one.
+
+
+    Works with any Home Assistant lights and any on/off motion or occupancy
+    sensor. Sounds play as announcements, so music playing on the same
+    speaker ducks under them instead of stopping.
+  domain: automation
+  author: Apollo Automation
+  homeassistant:
+    min_version: 2025.7.0
+  input:
+    start_section:
+      name: Start
+      icon: mdi:motion-sensor
+      collapsed: false
+      input:
+        start_sensors:
+          name: Start motion sensor
+          description: >-
+            Motion here starts a sequence. Usually the sensor farthest from the
+            door. Pick more than one to start from any of them.
+          selector:
+            entity:
+              multiple: true
+              filter: &motion_filter
+                - domain: binary_sensor
+                  device_class:
+                    - motion
+                    - occupancy
+                    - presence
+
+    stages_section:
+      name: Stages
+      icon: mdi:walk
+      collapsed: false
+      input:
+        stages:
+          name: Stages
+          description: >-
+            Add one stage per light group, in the order they should turn on.
+            A stage with a motion sensor waits for that sensor. A stage without
+            one turns on after its wait time: for the first stage, counted from
+            the start motion; for the others, from the stage before. An empty
+            wait time uses the First stage or Later stage wait time under
+            Timing.
+
+
+            If a later stage's sensor sees the visitor first, the stages in
+            between turn on with it. Use a different sensor for each stage;
+            a sensor that's still on from an earlier stage moves the sequence
+            on straight away.
+
+
+            Each stage uses the shared Stage look and Stage sound unless you
+            set its own color, brightness, effect or sound.
+          default: []
+          selector:
+            object:
+              multiple: true
+              label_field: lights
+              fields:
+                lights:
+                  label: Lights
+                  required: true
+                  selector:
+                    entity:
+                      multiple: true
+                      filter:
+                        - domain: light
+                sensor:
+                  label: Wait for this motion sensor (leave empty to use a timer)
+                  selector:
+                    entity:
+                      filter: *motion_filter
+                delay:
+                  label: Wait time when there's no sensor (leave empty for the default)
+                  selector:
+                    number: &delay_select
+                      min: 0
+                      max: 600
+                      step: 0.5
+                      unit_of_measurement: s
+                      mode: box
+                sound:
+                  label: Sound (leave empty for the shared Stage sound)
+                  selector:
+                    media:
+                color_mode:
+                  label: Color (leave empty for the Stage look)
+                  selector:
+                    select: &color_mode_select
+                      mode: dropdown
+                      options:
+                        - label: RGB color
+                          value: rgb
+                        - label: Color temperature (white)
+                          value: kelvin
+                        - label: Don't change the color
+                          value: none
+                rgb:
+                  label: RGB color
+                  selector:
+                    color_rgb:
+                kelvin:
+                  label: Color temperature
+                  selector:
+                    color_temp: &kelvin_select
+                      unit: kelvin
+                      min: 2000
+                      max: 6500
+                brightness:
+                  label: Brightness (leave empty for the Stage look)
+                  selector:
+                    number: &brightness_select
+                      min: 1
+                      max: 100
+                      step: 1
+                      unit_of_measurement: "%"
+                      mode: slider
+                effect:
+                  label: Effect (leave empty for the Stage look)
+                  selector:
+                    select: &effect_select
+                      mode: dropdown
+                      custom_value: true
+                      options:
+                        - None
+                        - Flicker
+                        - Pulse
+                        - Strobe
+                        - Rainbow
+                        - Color Wipe
+                        - Scan
+                        - Twinkle
+                        - Random Twinkle
+                        - Fireworks
+                        - Effect A
+                        - Effect B
+                        - candle
+                        - fire
+                        - prism
+                        - sparkle
+                        - opal
+                        - glisten
+                        - underwater
+                        - cosmos
+                        - sunbeam
+                        - enchant
+
+    finale_section:
+      name: Finale
+      icon: mdi:door
+      collapsed: false
+      input:
+        finale_sensor:
+          name: Finale motion sensor (optional)
+          description: >-
+            The finale waits for this sensor, usually the one by the door.
+            Leave empty to play the finale on a timer after the last stage.
+          default: ""
+          selector:
+            entity:
+              filter: *motion_filter
+        finale_delay:
+          name: Finale wait time
+          description: >-
+            Without a finale sensor, the finale plays this long after the last
+            stage turns on.
+          default: 5
+          selector:
+            number: *delay_select
+        finale_extra_lights:
+          name: Extra finale lights (optional)
+          description: >-
+            Lights that join the finale on top of the stage lights, such as a
+            porch light.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: light
+        finale_duration:
+          name: Finale length
+          description: How long the finale look stays on before the resting state.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 300
+              step: 1
+              unit_of_measurement: s
+              mode: box
+        finale_sound:
+          name: Finale sound (optional)
+          default: {}
+          selector:
+            media:
+        finale_color_mode:
+          name: Finale color
+          default: rgb
+          selector:
+            select: *color_mode_select
+        finale_rgb:
+          name: Finale RGB color
+          description: Used when the color is set to RGB color.
+          default: [0, 0, 255]
+          selector:
+            color_rgb:
+        finale_kelvin:
+          name: Finale color temperature
+          description: Used when the color is set to Color temperature.
+          default: 3000
+          selector:
+            color_temp: *kelvin_select
+        finale_brightness:
+          name: Finale brightness
+          default: 80
+          selector:
+            number: *brightness_select
+        finale_effect:
+          name: Finale effect
+          description: &effect_description >-
+            Pick one or type the name exactly as the light lists it. Each light
+            only gets an effect it supports; the others just change color and
+            brightness. None stops a running effect. Strobe-style effects
+            faster than 3 flashes per second can trigger seizures in people
+            with photosensitive epilepsy.
+          default: Pulse
+          selector:
+            select: *effect_select
+
+    stage_look_section:
+      name: Stage look and sound
+      icon: mdi:palette
+      description: How every stage looks and sounds, unless the stage sets its own.
+      collapsed: true
+      input:
+        stage_color_mode:
+          name: Stage color
+          default: rgb
+          selector:
+            select: *color_mode_select
+        stage_rgb:
+          name: Stage RGB color
+          description: Used when the color is set to RGB color.
+          default: [255, 100, 0]
+          selector:
+            color_rgb:
+        stage_kelvin:
+          name: Stage color temperature
+          description: Used when the color is set to Color temperature.
+          default: 3000
+          selector:
+            color_temp: *kelvin_select
+        stage_brightness:
+          name: Stage brightness
+          default: 75
+          selector:
+            number: *brightness_select
+        stage_effect:
+          name: Stage effect
+          description: *effect_description
+          default: Flicker
+          selector:
+            select: *effect_select
+        stage_sound:
+          name: Stage sound (optional)
+          description: Played each time a stage turns on, unless the stage has its own sound.
+          default: {}
+          selector:
+            media:
+
+    end_section:
+      name: Resting state
+      icon: mdi:sleep
+      description: What the lights do after the finale, or after a visitor turns back.
+      collapsed: true
+      input:
+        end_mode:
+          name: Resting state
+          default: "off"
+          selector:
+            select:
+              options:
+                - label: Turn off
+                  value: "off"
+                - label: Show the resting look below
+                  value: look
+                - label: Go back to how they were before the sequence
+                  value: restore
+        abandon_sound:
+          name: Turned-back sound (optional)
+          description: >-
+            Played when a visitor doesn't reach a stage's or the finale's
+            sensor in time.
+          default: {}
+          selector:
+            media:
+        end_color_mode:
+          name: Resting color
+          default: kelvin
+          selector:
+            select: *color_mode_select
+        end_rgb:
+          name: Resting RGB color
+          description: Used when the color is set to RGB color.
+          default: [255, 160, 60]
+          selector:
+            color_rgb:
+        end_kelvin:
+          name: Resting color temperature
+          description: Used when the color is set to Color temperature.
+          default: 2700
+          selector:
+            color_temp: *kelvin_select
+        end_brightness:
+          name: Resting brightness
+          default: 40
+          selector:
+            number: *brightness_select
+        end_effect:
+          name: Resting effect
+          description: *effect_description
+          default: None
+          selector:
+            select: *effect_select
+
+    timing_section:
+      name: Timing
+      icon: mdi:timer-outline
+      collapsed: true
+      input:
+        first_delay:
+          name: First stage wait time
+          description: >-
+            How long after the start motion the first stage turns on, when it
+            has no sensor and doesn't set its own wait time. 0 turns it on
+            right away.
+          default: 0
+          selector:
+            number: *delay_select
+        default_delay:
+          name: Later stage wait time
+          description: >-
+            How long each later stage without a sensor waits after the stage
+            before it, unless it sets its own wait time.
+          default: 3
+          selector:
+            number: *delay_select
+        step_timeout:
+          name: Time to reach a sensor
+          description: >-
+            How long a stage or the finale waits for its own sensor. If the
+            visitor doesn't set it off in time, the lit lights go to the
+            resting state.
+          default: 30
+          selector:
+            number:
+              min: 5
+              max: 600
+              step: 1
+              unit_of_measurement: s
+              mode: box
+        start_guard:
+          name: Reverse walk guard
+          description: >-
+            A sequence only starts if every stage and finale sensor has been
+            clear for at least this long, so someone walking away from the
+            door doesn't set it off on the way out. Set it to roughly the time
+            it takes to walk from the door to the start sensor. Only works
+            with more than one sensor.
+          default: 15
+          selector:
+            number:
+              min: 0
+              max: 120
+              step: 1
+              unit_of_measurement: s
+              mode: box
+        rearm:
+          name: Quiet time before a new show
+          description: >-
+            The start sensor must have seen no motion for this long before it
+            can start another show. A visitor waiting at the door keeps moving
+            now and then, and each new motion would otherwise replay the
+            show. The sensor's own hold time after motion counts as motion.
+          default: 20
+          selector:
+            number:
+              min: 0
+              max: 600
+              step: 1
+              unit_of_measurement: s
+              mode: box
+        cooldown:
+          name: Cooldown
+          description: After a sequence ends, wait this long before another can start.
+          default: 10
+          selector:
+            number:
+              min: 0
+              max: 600
+              step: 1
+              unit_of_measurement: s
+              mode: box
+        transition:
+          name: Transition
+          description: Fade time when lights change. 0 changes them instantly.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 10
+              step: 0.5
+              unit_of_measurement: s
+              mode: box
+        sound_delay:
+          name: Light delay after a sound
+          description: >-
+            Speakers take a moment to start a sound. When a step has a sound,
+            its lights wait this long after the sound is sent so the two land
+            together. Tune it by ear; 0 changes the lights right away.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 3000
+              step: 50
+              unit_of_measurement: ms
+              mode: slider
+
+    options_section:
+      name: Sound player and options
+      icon: mdi:cog
+      collapsed: true
+      input:
+        sound_player:
+          name: Sound player
+          description: >-
+            Plays every sound. Leave empty to use the player each sound was
+            picked from. With Music Assistant, pick the speaker's own player
+            rather than the Music Assistant one, so music ducks under the
+            sound instead of pausing.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: media_player
+        set_volume:
+          name: Set the volume during a sequence
+          description: >-
+            Sets the sound player's volume when a sequence starts and puts it
+            back when the sequence ends. This is the player's only volume, so
+            music playing on it changes too. Needs a Sound player above.
+          default: false
+          selector:
+            boolean:
+        sound_volume:
+          name: Sequence volume
+          default: 60
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+        enable_entity:
+          name: Enable switch (optional)
+          description: >-
+            Sequences only start while this is on, for example a Halloween
+            mode toggle. Leave empty to always run.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - input_boolean
+                    - switch
+                    - binary_sensor
+        pause_entities:
+          name: Switches to pause during a sequence (optional)
+          description: >-
+            Turned off while a sequence runs and back on afterwards if they
+            were on, for example a CAST-1's LED Strip Music Mode, which
+            otherwise takes over the strip when music starts or stops.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain:
+                    - switch
+                    - input_boolean
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input start_sensors
+    from: "off"
+    to: "on"
+
+variables:
+  start_input: !input start_sensors
+  stage_inputs: !input stages
+  finale_sensor: !input finale_sensor
+  finale_delay: !input finale_delay
+  first_delay: !input first_delay
+  default_delay: !input default_delay
+  finale_extra_lights: !input finale_extra_lights
+  finale_sound: !input finale_sound
+  stage_sound: !input stage_sound
+  abandon_sound: !input abandon_sound
+  end_mode: !input end_mode
+  start_guard: !input start_guard
+  rearm: !input rearm
+  step_timeout: !input step_timeout
+  transition_s: !input transition
+  sound_delay: !input sound_delay
+  sound_player: !input sound_player
+  set_volume: !input set_volume
+  sound_volume: !input sound_volume
+  enable_entity: !input enable_entity
+  pause_entities: !input pause_entities
+  stage_look:
+    color_mode: !input stage_color_mode
+    rgb: !input stage_rgb
+    kelvin: !input stage_kelvin
+    brightness: !input stage_brightness
+    effect: !input stage_effect
+  finale_look:
+    color_mode: !input finale_color_mode
+    rgb: !input finale_rgb
+    kelvin: !input finale_kelvin
+    brightness: !input finale_brightness
+    effect: !input finale_effect
+  end_look:
+    color_mode: !input end_color_mode
+    rgb: !input end_rgb
+    kelvin: !input end_kelvin
+    brightness: !input end_brightness
+    effect: !input end_effect
+  start_list: "{{ [start_input] if start_input is string else start_input | list }}"
+  # Stages with lights, each with its sensor and wait time, its look filled
+  # in from the Stage look and its sound resolved to {id, type, player}
+  stages: >-
+    {%- set ns = namespace(out=[]) -%}
+    {%- for s in stage_inputs if s is mapping -%}
+      {%- set lights = s.get('lights') or [] -%}
+      {%- set lights = [lights] if lights is string else lights | list -%}
+      {%- if lights | count > 0 -%}
+        {%- set own_color = s.get('color_mode') not in [none, ''] -%}
+        {%- set effect = s.get('effect') -%}
+        {%- set look = {
+          'color_mode': s.get('color_mode') if own_color else stage_look.color_mode,
+          'rgb': s.get('rgb') if own_color and s.get('rgb') else stage_look.rgb,
+          'kelvin': s.get('kelvin') if own_color and s.get('kelvin') else stage_look.kelvin,
+          'brightness': s.get('brightness') if s.get('brightness') is number else stage_look.brightness,
+          'effect': effect if effect is string and effect | trim != '' else stage_look.effect
+        } -%}
+        {%- set snd = s.get('sound') -%}
+        {%- set snd = snd if snd is mapping and snd.get('media_content_id') else stage_sound -%}
+        {%- set snd = snd if snd is mapping else {} -%}
+        {%- set ns.out = ns.out + [{
+          'sensor': s.get('sensor') or '',
+          'delay': s.get('delay') if s.get('delay') is number
+                   else (first_delay if ns.out | count == 0 else default_delay) | float(0),
+          'lights': lights,
+          'look': look,
+          'sound': {
+            'id': snd.get('media_content_id') or '',
+            'type': snd.get('media_content_type') or 'music',
+            'player': sound_player or snd.get('entity_id') or ''
+          }
+        }] -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ns.out }}
+  # The sensor of each step, stages then the finale; '' for a timed step
+  step_sensors: "{{ stages | map(attribute='sensor') | list + [finale_sensor or ''] }}"
+  # light.turn_on data for the finale, resting state and each stage, in that
+  # order; the effect is added per light when the look is applied
+  look_data: >-
+    {%- set ns = namespace(out=[]) -%}
+    {%- for l in [finale_look, end_look] + stages | map(attribute='look') | list -%}
+      {#- Only send a fade when one is set: ESPHome warns when an effect comes with any transition, even 0 -#}
+      {%- set d = {'brightness_pct': l.brightness | int(100)} -%}
+      {%- if transition_s | float(0) > 0 -%}
+        {%- set d = dict(d, transition=transition_s | float(0)) -%}
+      {%- endif -%}
+      {%- if l.color_mode == 'rgb' and l.rgb -%}
+        {%- set d = dict(d, rgb_color=l.rgb | list) -%}
+      {%- elif l.color_mode == 'kelvin' and l.kelvin -%}
+        {%- set d = dict(d, color_temp_kelvin=l.kelvin | int) -%}
+      {%- endif -%}
+      {%- set ns.out = ns.out + [d] -%}
+    {%- endfor -%}
+    {{ ns.out }}
+  all_lights: >-
+    {{ (stages | map(attribute='lights') | sum(start=[]) + finale_extra_lights) | unique | list }}
+  snapshot_scene: "porch_motion_sequence_{{ this.entity_id.split('.')[1] }}"
+
+conditions:
+  - condition: template
+    value_template: "{{ enable_entity == '' or is_state(enable_entity, 'on') }}"
+  - condition: template
+    value_template: "{{ stages | count > 0 }}"
+  # The start sensor was clear long enough before this motion: a new arrival,
+  # not a visitor still waiting at the door
+  - condition: template
+    value_template: >-
+      {{ not trigger.from_state or not trigger.to_state
+         or (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds()
+            >= rearm | float(0) }}
+  # Reverse walk guard: every stage and finale sensor other than the start
+  # sensors has been clear for a while, so the visitor didn't come from the door
+  - condition: template
+    value_template: >-
+      {%- set others = step_sensors | reject('eq', '') | reject('in', start_list) | unique | list -%}
+      {%- set ns = namespace(ok=true) -%}
+      {%- for s in expand(others) -%}
+        {%- if s.state == 'on' or (now() - s.last_changed).total_seconds() < start_guard | float(0) -%}
+          {%- set ns.ok = false -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ ns.ok }}
+
+actions:
+  # Pausing switches, the volume and the snapshot wait until the first lights
+  # change, so a passerby who never reaches a first-stage sensor touches nothing
+  - variables:
+      started: false
+      paused: []
+      prev_volume: null
+
+  # idx is the last lit stage (-1 before the first). Each pass waits for the
+  # next step (the next stage, or the finale after the last one): for its
+  # sensor, or for its wait time when it has none. A later step's sensor
+  # going on ends the wait early and jumps ahead. outcome becomes finale or
+  # abandon
+  - variables:
+      idx: -1
+      outcome: ""
+  - repeat:
+      while:
+        - condition: template
+          value_template: "{{ outcome == '' }}"
+      sequence:
+        - variables:
+            nstep: "{{ idx + 1 }}"
+            next_sensor: "{{ step_sensors[idx + 1] }}"
+            next_delay: >-
+              {{ (stages[idx + 1].delay if idx + 1 < stages | count else finale_delay) | float(0) }}
+            later_sensors: "{{ step_sensors[idx + 1:] | reject('eq', '') | unique | list }}"
+        - wait_template: >-
+            {{ (next_sensor == '' and next_delay <= 0)
+               or expand(later_sensors) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+          timeout:
+            seconds: "{{ step_timeout if next_sensor != '' else next_delay }}"
+          continue_on_timeout: true
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ not wait.completed and next_sensor != '' }}"
+              sequence:
+                - variables:
+                    outcome: abandon
+          default:
+            # The furthest step whose sensor is on, or the next step when
+            # its timer ran out
+            - variables:
+                target: >-
+                  {%- set ns = namespace(t=nstep) -%}
+                  {%- for s in step_sensors -%}
+                    {%- if loop.index0 > nstep and s != '' and is_state(s, 'on') -%}
+                      {%- set ns.t = loop.index0 -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {{ ns.t }}
+            - if:
+                - condition: template
+                  value_template: "{{ not started }}"
+              then:
+                - variables:
+                    started: true
+                    paused: >-
+                      {{ expand(pause_entities) | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}
+                    prev_volume: >-
+                      {{ state_attr(sound_player, 'volume_level') if set_volume and sound_player != '' else none }}
+                - if:
+                    - condition: template
+                      value_template: "{{ paused | count > 0 }}"
+                  then:
+                    - action: homeassistant.turn_off
+                      target:
+                        entity_id: "{{ paused }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ set_volume and sound_player != '' }}"
+                  then:
+                    - action: media_player.volume_set
+                      target:
+                        entity_id: "{{ sound_player }}"
+                      data:
+                        volume_level: "{{ (sound_volume | float(60)) / 100 }}"
+                      continue_on_error: true
+                - if:
+                    - condition: template
+                      value_template: "{{ end_mode == 'restore' and all_lights | count > 0 }}"
+                  then:
+                    - action: scene.create
+                      data:
+                        scene_id: "{{ snapshot_scene }}"
+                        snapshot_entities: "{{ all_lights }}"
+            - if:
+                - condition: template
+                  value_template: "{{ target >= stages | count }}"
+              then:
+                # Skipped stages join the finale directly
+                - variables:
+                    idx: "{{ stages | count - 1 }}"
+                    outcome: finale
+              else:
+                - variables:
+                    snd: "{{ stages[target].sound }}"
+                    jobs: >-
+                      {%- set ns = namespace(out=[]) -%}
+                      {%- for i in range(idx + 1, target + 1) -%}
+                        {%- for l in stages[i].lights -%}
+                          {%- set ns.out = ns.out + [{'light': l, 'data': look_data[i + 2], 'effect': stages[i].look.effect}] -%}
+                        {%- endfor -%}
+                      {%- endfor -%}
+                      {{ ns.out }}
+                # play_media can hold the run until the sound ends, so the
+                # sound gets its own branch and the lights don't wait for it
+                - parallel:
+                    - if:
+                        - condition: template
+                          value_template: "{{ snd.id != '' and snd.player != '' }}"
+                      then:
+                        - action: media_player.play_media
+                          target:
+                            entity_id: "{{ snd.player }}"
+                          data:
+                            media_content_id: "{{ snd.id }}"
+                            media_content_type: "{{ snd.type }}"
+                            announce: true
+                          continue_on_error: true
+                    - sequence:
+                        - if:
+                            - condition: template
+                              value_template: "{{ snd.id != '' and snd.player != '' }}"
+                          then:
+                            - delay:
+                                milliseconds: "{{ sound_delay | int(0) }}"
+                        - repeat: &apply_jobs
+                            for_each: "{{ jobs }}"
+                            sequence:
+                              # The look's effect, matched to the name this light uses
+                              # for it; None picks the light's own "None" or "off"
+                              - action: light.turn_on
+                                target:
+                                  entity_id: "{{ repeat.item.light }}"
+                                data: >-
+                                  {%- set fx = state_attr(repeat.item.light, 'effect_list') or [] -%}
+                                  {%- set want = (repeat.item.effect or 'None') | string | trim | lower -%}
+                                  {%- set names = ['none', 'off'] if want in ['', 'none', 'off'] else [want] -%}
+                                  {%- set ns = namespace(e='') -%}
+                                  {%- for f in fx -%}
+                                    {%- if ns.e == '' and (f | string | lower) in names -%}
+                                      {%- set ns.e = f -%}
+                                    {%- endif -%}
+                                  {%- endfor -%}
+                                  {{ dict(repeat.item.data, effect=ns.e) if ns.e else repeat.item.data }}
+                                continue_on_error: true
+                - variables:
+                    idx: "{{ target }}"
+
+  - variables:
+      lit_lights: >-
+        {{ stages[:idx + 1] | map(attribute='lights') | sum(start=[]) | unique | list }}
+  - variables:
+      # No turned-back sound when the visitor never reached the first stage
+      raw_sound: >-
+        {{ finale_sound if outcome == 'finale' else (abandon_sound if lit_lights | count > 0 else {}) }}
+      end_lights: >-
+        {{ (lit_lights + finale_extra_lights) | unique | list if outcome == 'finale' else lit_lights }}
+  - variables:
+      snd:
+        id: "{{ (raw_sound.get('media_content_id') if raw_sound is mapping else '') or '' }}"
+        type: "{{ (raw_sound.get('media_content_type') if raw_sound is mapping else '') or 'music' }}"
+        player: >-
+          {{ sound_player or (raw_sound.get('entity_id') if raw_sound is mapping else '') or '' }}
+
+  # The finale or turned-back sound plays in its own branch while the lights
+  # run the finale and resting state
+  - parallel:
+      - if:
+          - condition: template
+            value_template: "{{ snd.id != '' and snd.player != '' }}"
+        then:
+          - action: media_player.play_media
+            target:
+              entity_id: "{{ snd.player }}"
+            data:
+              media_content_id: "{{ snd.id }}"
+              media_content_type: "{{ snd.type }}"
+              announce: true
+            continue_on_error: true
+      - sequence:
+          - if:
+              - condition: template
+                value_template: "{{ outcome == 'finale' and snd.id != '' and snd.player != '' }}"
+            then:
+              - delay:
+                  milliseconds: "{{ sound_delay | int(0) }}"
+          - if:
+              - condition: template
+                value_template: "{{ outcome == 'finale' }}"
+            then:
+              - variables:
+                  jobs: >-
+                    {%- set ns = namespace(out=[]) -%}
+                    {%- for l in end_lights -%}
+                      {%- set ns.out = ns.out + [{'light': l, 'data': look_data[0], 'effect': finale_look.effect}] -%}
+                    {%- endfor -%}
+                    {{ ns.out }}
+              - repeat: *apply_jobs
+              - delay: !input finale_duration
+
+          # Resting state
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ end_mode == 'restore' and started and all_lights | count > 0 }}"
+                sequence:
+                  - action: scene.turn_on
+                    target:
+                      entity_id: "scene.{{ snapshot_scene }}"
+                    data:
+                      transition: "{{ transition_s | float(0) }}"
+                    continue_on_error: true
+              - conditions:
+                  - condition: template
+                    value_template: "{{ end_mode == 'look' }}"
+                sequence:
+                  - variables:
+                      jobs: >-
+                        {%- set ns = namespace(out=[]) -%}
+                        {%- for l in end_lights -%}
+                          {%- set ns.out = ns.out + [{'light': l, 'data': look_data[1], 'effect': end_look.effect}] -%}
+                        {%- endfor -%}
+                        {{ ns.out }}
+                  - repeat: *apply_jobs
+            default:
+              - if:
+                  - condition: template
+                    value_template: "{{ end_lights | count > 0 }}"
+                then:
+                  - action: light.turn_off
+                    target:
+                      entity_id: "{{ end_lights }}"
+                    data:
+                      transition: "{{ transition_s | float(0) }}"
+                    continue_on_error: true
+
+  - if:
+      - condition: template
+        value_template: "{{ paused | count > 0 }}"
+    then:
+      - action: homeassistant.turn_on
+        target:
+          entity_id: "{{ paused }}"
+  - if:
+      - condition: template
+        value_template: "{{ prev_volume is number }}"
+    then:
+      - action: media_player.volume_set
+        target:
+          entity_id: "{{ sound_player }}"
+        data:
+          volume_level: "{{ prev_volume }}"
+        continue_on_error: true
+  - delay: !input cooldown
