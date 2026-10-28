@@ -33,6 +33,16 @@ Configure every button without leaving Home Assistant using the [CAST-1 WizMote 
 
 [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FBlueprints%2Fblob%2Fmain%2FCAST-1%2FCAST-1-WizMote.yaml)
 
+## Announcements
+
+While an announcement plays, music ducks and the onboard LED lights up. Change either in your device YAML in ESPHome Device Builder, then install:
+
+```yaml
+substitutions:
+  announcement_ducking_db: "20"         # how far music drops, in dB (default 40; 0 = no ducking)
+  announcement_led_brightness: "25%"    # onboard LED brightness during announcements (default 50%)
+```
+
 ## External LED Strip
 
 The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). Set how many LEDs it has in your device YAML in ESPHome Device Builder (the default is 30), then install:

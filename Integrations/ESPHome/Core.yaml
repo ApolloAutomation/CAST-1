@@ -4,6 +4,11 @@ substitutions:
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
   beta_manifest_file: "manifest.json"
+  # How far music drops (in dB) while an announcement plays; set in the
+  # device YAML's substitutions to override it (0 = no ducking)
+  announcement_ducking_db: "40"
+  # Onboard LED brightness while an announcement plays (0%-100%)
+  announcement_led_brightness: "50%"
 
 
 packages:
@@ -597,10 +602,10 @@ media_player:
                 blue: 100%
                 red: 0%
                 green: 100%
-                brightness: 50%
+                brightness: ${announcement_led_brightness}
             - mixer_speaker.apply_ducking:
                 id: media_mixer_input
-                decibel_reduction: 40
+                decibel_reduction: ${announcement_ducking_db}
                 duration: 0.0s
             - wait_until:
                 media_player.is_announcing: external_media_player
