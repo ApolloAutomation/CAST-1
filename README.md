@@ -45,18 +45,30 @@ substitutions:
 
 ## External LED Strip
 
-The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). The strip is opt-in: add `led_strip.yaml` to the packages in your device YAML in ESPHome Device Builder, set how many LEDs it has (the default is 30), then install:
+The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). The strip is opt-in. To add it:
+
+1. In ESPHome Device Builder, click **Edit** on your CAST-1.
+2. Find the `packages:` section. An adopted CAST-1 already has one line there that points at `CAST-1.yaml`.
+3. Add a `led_strip` line under it that points at `led_strip.yaml`. Keep the same repository and the same `@` branch as the existing line, if it has one.
+4. Set how many LEDs the strip has with `led_strip_num_leds` (the default is 30). Add it to the existing `substitutions:` section rather than starting a second one.
+5. Click **Save**, then **Install**.
+
+Your device YAML ends up looking like this (other lines left out):
 
 ```yaml
 substitutions:
+  name: apollo-cast-1-abc123
+  friendly_name: Apollo CAST-1
   led_strip_num_leds: "21"
 
 packages:
-  cast_1: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1.yaml@main
-  led_strip: github://ApolloAutomation/CAST-1/Integrations/ESPHome/led_strip.yaml@main
+  ApolloAutomation.CAST-1: github://ApolloAutomation/CAST-1/Integrations/ESPHome/CAST-1.yaml
+  led_strip: github://ApolloAutomation/CAST-1/Integrations/ESPHome/led_strip.yaml
 ```
 
-Remove the `led_strip` line to drop the strip again. Any partitions you added have to go with it, since they use the strip.
+Device Builder keeps a copy of each package for a day, so a new firmware release can take up to a day to show up in an install.
+
+To drop the strip again, delete the `led_strip` line and install. Delete any partitions you added at the same time, since they use the strip.
 
 The rest of the strip's settings live in Home Assistant and under **External LED Strip** on the device's web page:
 
