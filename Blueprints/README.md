@@ -6,9 +6,9 @@ They work with any Home Assistant lights (a CAST-1 LED strip, Hue bulbs and so o
 
 | Blueprint | Sensors | Import |
 | --- | --- | --- |
-| **Zone-Based** | Presence zones, such as LD2450 radar zones made with Zone Mapper, or any on/off occupancy sensors | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FCAST-1%2Fblob%2Fmain%2FBlueprints%2FCAST-1-Porch-Zone-Based.yaml) |
-| **Distance-Based** | One radar distance reading, such as an LD2410 or LD2412 (Apollo R PRO-1) mounted by the door | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FCAST-1%2Fblob%2Fmain%2FBlueprints%2FCAST-1-Porch-Distance-Based.yaml) |
-| **Motion-Based** | One or more PIR motion sensors, such as the ESPHome Starter Kit | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FCAST-1%2Fblob%2Fmain%2FBlueprints%2FCAST-1-Porch-Motion-Based.yaml) |
+| **Zone-Based** | Presence zones, such as LD2450 radar zones made with Zone Mapper, or any on/off occupancy sensors | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FCAST-1%2Fblob%2Fmain%2FBlueprints%2FCAST-1-Porch-Zone-Based.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import blueprint" height="40"></a> |
+| **Distance-Based** | One radar distance reading, such as an LD2410 or LD2412 (Apollo R PRO-1) mounted by the door | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FCAST-1%2Fblob%2Fmain%2FBlueprints%2FCAST-1-Porch-Distance-Based.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import blueprint" height="40"></a> |
+| **Motion-Based** | One or more PIR motion sensors, such as the ESPHome Starter Kit | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FApolloAutomation%2FCAST-1%2Fblob%2Fmain%2FBlueprints%2FCAST-1-Porch-Motion-Based.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import blueprint" height="40"></a> |
 
 All three need Home Assistant 2025.7 or newer.
 
