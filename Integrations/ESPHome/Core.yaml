@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.10.14.3"
+  version: "26.10.30.1"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -14,11 +14,11 @@ esphome:
   friendly_name: Apollo CAST-1
   comment: Apollo CAST-1
   name_add_mac_suffix: true
-  # network: priority: (WiFi + Ethernet in one firmware) needs 2026.8
-  min_version: 2026.8.0
+  # improv_ble (renamed from esp32_improv) needs 2026.10
+  min_version: 2026.10.0
   platformio_options:
     board_build.flash_mode: dio
-  # List form so package on_boot entries (wizmote.yaml) merge
+  # List form so package on_boot entries (wizmote.yaml, led_strip.yaml) merge
   on_boot:
     - priority: 800
       then:
@@ -62,6 +62,19 @@ esphome:
     - priority: -100
       then:
         - script.execute: apply_ota_source
+    # Firmware before ESPHome 2026.10 saved volume 0 as muted, and volume no
+    # longer clears mute; unmute that once (silent at volume 0)
+    - priority: -100
+      then:
+        - if:
+            condition:
+              and:
+                - lambda: "return !id(zero_volume_mute_fixed);"
+                - media_player.is_muted: external_media_player
+                - lambda: "return id(external_media_player).volume < 0.001f;"
+            then:
+              - media_player.unmute: external_media_player
+        - lambda: "id(zero_volume_mute_fixed) = true;"
     # Ethernet never came up, so bring WiFi back for rejoin or provisioning
     - priority: -100
       then:
@@ -210,8 +223,8 @@ captive_portal:
 improv_serial:
   id: improv_serial_1
 
-esp32_improv:
-  id: esp32_improv_1
+improv_ble:
+  id: improv_ble_1
   authorizer: none
 
 esp32:
@@ -252,6 +265,11 @@ api:
   encryption:
 
 globals:
+  # Set after the one-time volume-0 unmute check on first boot
+  - id: zero_volume_mute_fixed
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
   - id: cycleCounter
     type: int
     restore_value: no
@@ -477,6 +495,37 @@ light:
           min_brightness: 50%
           max_brightness: 100%
 
+number:
+  # How far music drops while an announcement plays (0 = no ducking)
+  - platform: template
+    id: announcement_ducking
+    name: "Announcement Ducking"
+    icon: mdi:volume-minus
+    entity_category: config
+    unit_of_measurement: "dB"
+    mode: slider
+    min_value: -80
+    max_value: 0
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: -40
+
+  # Onboard LED brightness while an announcement plays (0 = LED stays off)
+  - platform: template
+    id: announcement_led_brightness
+    name: "Announcement LED Brightness"
+    icon: mdi:brightness-percent
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: slider
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 50
+
 select:
   - platform: template
     id: firmware_channel
@@ -592,15 +641,19 @@ media_player:
             - lambda: return (!id(announcement_triggered));
           then:
             - lambda: id(announcement_triggered) = true;
-            - light.turn_on:
-                id: rgb_light
-                blue: 100%
-                red: 0%
-                green: 100%
-                brightness: 50%
+            - if:
+                condition:
+                  lambda: "return id(announcement_led_brightness).state > 0;"
+                then:
+                  - light.turn_on:
+                      id: rgb_light
+                      blue: 100%
+                      red: 0%
+                      green: 100%
+                      brightness: !lambda "return id(announcement_led_brightness).state / 100.0f;"
             - mixer_speaker.apply_ducking:
                 id: media_mixer_input
-                decibel_reduction: 40
+                decibel_reduction: !lambda "return (uint8_t) -id(announcement_ducking).state;"
                 duration: 0.0s
             - wait_until:
                 media_player.is_announcing: external_media_player

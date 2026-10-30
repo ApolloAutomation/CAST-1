@@ -1,5 +1,11 @@
 # LED strip on the exposed 5V / GND / IO1 header; included by Core.yaml
 
+substitutions:
+  # The most LEDs the LED Strip Count can be set to (its buffers are sized
+  # for this many at compile time); set led_strip_num_leds in the device
+  # YAML's substitutions to raise it. Partitions must fit inside it
+  led_strip_num_leds: "300"
+
 esphome:
   on_boot:
     # Apply the saved LED strip settings before the light's first write
@@ -7,7 +13,8 @@ esphome:
     - priority: 600
       then:
         - lambda: |-
-            id(led_strip_output)->set_num_leds((uint16_t) id(led_strip_count).state);
+            id(led_strip_output)->set_num_leds(
+                (uint16_t) clamp<float>(id(led_strip_count).state, 1.0f, ${led_strip_num_leds}));
         - script.execute: led_strip_blank_all
         - script.execute:
             id: led_strip_apply_color_order
@@ -19,18 +26,28 @@ esphome:
             id: led_strip_apply_max_brightness
             percent: !lambda "return id(led_strip_max_brightness).state;"
 
+# Every LED strip entity sits under one header on the device's web page
+web_server:
+  sorting_groups:
+    - id: sg_led_strip
+      name: "External LED Strip"
+      sorting_weight: 10
+
 light:
   - platform: esp32_rmt_led_strip
     id: led_strip
     output_id: led_strip_output
     name: "LED Strip"
-    disabled_by_default: true
     icon: mdi:led-strip-variant
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 1
     pin: GPIO1
     # Timings and color order are swapped at runtime by the select entities
     chipset: WS2812
     channel_colors: GRB
-    num_leds: 300
+    num_leds: ${led_strip_num_leds}
     # The rest of the RMT TX memory after the onboard light's 48
     rmt_symbols: 144
     # The RMT interrupt refills from these buffers mid-frame; PSRAM reads can
@@ -41,6 +58,7 @@ light:
     # Re-send the settled frame once, and clear the whole strip after turn-off
     on_state:
       - script.execute: led_strip_refresh
+    # New effects go at the end: the light restores its effect by position
     effects:
       - addressable_rainbow:
           name: "Rainbow"
@@ -61,16 +79,194 @@ light:
       - strobe:
           name: "Strobe"
 
+      # Effect A and Effect B run the pattern their Pattern select picks, at
+      # their own Speed. Partition lights in the device YAML can
+      # list the same two entries (https://esphome.io/components/light/partition/)
+      - addressable_lambda:
+          name: "Effect A"
+          # About one frame per main-loop pass (~16 ms); the helper keeps its
+          # own clock, so this only caps how often the strip is re-sent
+          update_interval: 15ms
+          lambda: "id(led_strip_slot_effect)(it, current_color, initial_run, 0);"
+      - addressable_lambda:
+          name: "Effect B"
+          update_interval: 15ms
+          lambda: "id(led_strip_slot_effect)(it, current_color, initial_run, 1);"
+
+globals:
+  # Renders Effect A (slot 0) and Effect B (slot 1) for any addressable light,
+  # so the LED Strip and partition lights share one copy and one set of
+  # Pattern / Speed entities. A globals initializer is plain C++,
+  # so it names the entities directly instead of through id()
+  - id: led_strip_slot_effect
+    type: std::function<void(light::AddressableLight &, Color, bool, int)>
+    restore_value: no
+    initial_value: |-
+      [](light::AddressableLight &it, Color color, bool initial_run, int slot) {
+        struct SlotState {
+          int pattern;
+          float level;
+          float target;
+          uint32_t next_ms;
+          uint32_t cycle_start;
+          uint32_t pos;
+        };
+        // One state per light, since a light runs one effect at a time
+        static const light::AddressableLight *owners[16] = {};
+        static SlotState states[16];
+        int i = 0;
+        while (i < 16 && owners[i] != nullptr && owners[i] != &it) i++;
+        if (i == 16) return;
+        if (owners[i] == nullptr) {
+          owners[i] = &it;
+          initial_run = true;
+        }
+        SlotState &st = states[i];
+        const uint32_t now = millis();
+        const int32_t n = it.size();
+        if (n <= 0) return;
+
+        // Each template select is its own type (it carries its initial option),
+        // so pick through the shared base classes
+        select::Select *pattern_sel = slot == 1 ? static_cast<select::Select *>(led_strip_effect_b_pattern)
+                                                : static_cast<select::Select *>(led_strip_effect_a_pattern);
+        number::Number *speed_num = slot == 1 ? static_cast<number::Number *>(led_strip_effect_b_speed)
+                                              : static_cast<number::Number *>(led_strip_effect_a_speed);
+        const int pattern = (int) pattern_sel->active_index().value_or(0);
+        const float speed = clamp(speed_num->state, 1.0f, 100.0f);
+        // Speed 1-100 on a log curve: 1 = 1000 ms, 50 = 182 ms, 100 = 32 ms,
+        // so the fastest step lands on two ~16 ms main-loop passes
+        const uint32_t period = (uint32_t) (1000.0f * powf(0.032f, (speed - 1.0f) / 99.0f));
+
+        // A pattern change mid-effect starts the new pattern fresh
+        if (initial_run || pattern != st.pattern) {
+          st.pattern = pattern;
+          st.level = 1.0f;
+          st.target = 1.0f;
+          st.next_ms = now;
+          st.cycle_start = now;
+          st.pos = 0;
+          for (int32_t p = 0; p < n; p++) it[p].set_effect_data(0);
+        }
+
+        // Steps due since the last frame, one per period. After a stall the
+        // pattern skips ahead instead of racing to catch up
+        uint32_t steps = 0;
+        const int32_t late = (int32_t) (now - st.next_ms);
+        if (late >= 0) {
+          steps = 1 + (uint32_t) late / period;
+          st.next_ms += steps * period;
+          if (steps > 4) {
+            steps = 4;
+            st.next_ms = now + period;
+          }
+        } else if (-late > (int32_t) period) {
+          // A raised Speed pulls in a step that was scheduled further out
+          st.next_ms = now + period;
+        }
+
+        switch (pattern) {
+          case 1: {
+            // Strobe: on for one period, off for the next
+            const uint32_t cycle = period * 2;
+            if (now - st.cycle_start >= cycle) st.cycle_start = now - (now - st.cycle_start) % cycle;
+            it.all() = (now - st.cycle_start) < period ? color : Color::BLACK;
+            break;
+          }
+          case 2: {
+            // Rainbow: one rainbow spans about 50 LEDs and shifts a hue step
+            // every period (it ignores the light's color)
+            st.pos += steps * 4;
+            for (int32_t p = 0; p < n; p++)
+              it[p] = light::ESPHSVColor((uint8_t) (st.pos + p * 5), 255, 255).to_rgb();
+            break;
+          }
+          case 3: {
+            // Color Wipe: fills one more LED each period, then clears them
+            // one at a time from the start
+            st.pos = (st.pos + steps) % (uint32_t) (2 * n);
+            const int32_t q = (int32_t) st.pos;
+            for (int32_t p = 0; p < n; p++) it[p] = (q < n ? p <= q : p > q - n) ? color : Color::BLACK;
+            break;
+          }
+          case 4: {
+            // Scan: one lit LED moves a step each period and bounces at the ends
+            const uint32_t span = n > 1 ? (uint32_t) (2 * n - 2) : 1;
+            st.pos = (st.pos + steps) % span;
+            const int32_t q = (int32_t) st.pos;
+            it.all() = Color::BLACK;
+            it[q < n ? q : (int32_t) span - q] = color;
+            break;
+          }
+          case 5: {
+            // Twinkle: random LEDs fade in and out over 8 periods; each LED's
+            // effect data holds how far along its twinkle is (0 = dark)
+            for (uint32_t s = 0; s < steps; s++) {
+              for (int32_t p = 0; p < n; p++) {
+                uint8_t d = it[p].get_effect_data();
+                if (d != 0) {
+                  d = d >= 224 ? 0 : d + 32;
+                } else if (random_float() < 0.05f) {
+                  d = 1;
+                }
+                it[p].set_effect_data(d);
+              }
+            }
+            for (int32_t p = 0; p < n; p++) {
+              const uint8_t d = it[p].get_effect_data();
+              it[p] = color * (uint8_t) (d < 128 ? d * 2 : (255 - d) * 2);
+            }
+            break;
+          }
+          case 6: {
+            // Pulse: fades smoothly from off to full and back every 4 periods
+            const uint32_t cycle = period * 4;
+            if (now - st.cycle_start >= cycle) st.cycle_start = now - (now - st.cycle_start) % cycle;
+            const float t = (float) (now - st.cycle_start) / (float) cycle;
+            it.all() = color * (uint8_t) ((0.5f - 0.5f * cosf(6.2831853f * t)) * 255.0f);
+            break;
+          }
+          case 7: {
+            // Fireworks: sparks light at random each period, then fade while
+            // spreading to their neighbours; effect data holds each LED's level
+            for (uint32_t s = 0; s < steps; s++) {
+              uint8_t prev = 0;
+              for (int32_t p = 0; p < n; p++) {
+                const uint8_t cur = it[p].get_effect_data();
+                const uint8_t next = p + 1 < n ? it[p + 1].get_effect_data() : 0;
+                it[p].set_effect_data((uint8_t) std::max<uint16_t>(cur * 3 / 5, (prev + next) * 3 / 10));
+                prev = cur;
+              }
+              if (random_float() < 0.15f) it[random_uint32() % (uint32_t) n].set_effect_data(255);
+            }
+            for (int32_t p = 0; p < n; p++) it[p] = color * it[p].get_effect_data();
+            break;
+          }
+          default: {
+            // Flicker: every period the light picks a new random level, no lower
+            // than 30%, and eases toward it within a few frames
+            if (steps > 0) st.target = 1.0f - 0.7f * random_float();
+            st.level += (st.target - st.level) * 0.6f;
+            it.all() = color * (uint8_t) (st.level * 255.0f);
+            break;
+          }
+        }
+      }
+
 number:
+  # How many LEDs are driven; LEDs past it are left dark
   - platform: template
     id: led_strip_count
     name: "LED Strip Count"
-    disabled_by_default: true
     icon: mdi:counter
     entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 20
     mode: box
     min_value: 1
-    max_value: 300
+    max_value: ${led_strip_num_leds}
     step: 1
     optimistic: true
     restore_value: true
@@ -84,9 +280,12 @@ number:
   - platform: template
     id: led_strip_max_brightness
     name: "LED Strip Max Brightness"
-    disabled_by_default: true
     icon: mdi:brightness-percent
     entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 21
     unit_of_measurement: "%"
     mode: slider
     min_value: 10
@@ -100,13 +299,52 @@ number:
           id: led_strip_apply_max_brightness
           percent: !lambda "return x;"
 
+  # Speed 1-100 maps on a log curve from 1 s (1) to 32 ms (100) between changes
+  - platform: template
+    id: led_strip_effect_a_speed
+    name: "LED Strip Effect A Speed"
+    icon: mdi:speedometer
+    entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 12
+    mode: slider
+    min_value: 1
+    max_value: 100
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 50
+
+  - platform: template
+    id: led_strip_effect_b_speed
+    name: "LED Strip Effect B Speed"
+    icon: mdi:speedometer
+    entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 15
+    mode: slider
+    min_value: 1
+    max_value: 100
+    step: 1
+    optimistic: true
+    restore_value: true
+    # Strobe at 45 flashes about twice a second, under the 3 Hz photosensitivity limit
+    initial_value: 45
+
 select:
   - platform: template
     id: led_strip_color_order
     name: "LED Strip Color Order"
-    disabled_by_default: true
     icon: mdi:palette
     entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 22
     optimistic: true
     restore_value: true
     options:
@@ -125,9 +363,12 @@ select:
   - platform: template
     id: led_strip_chipset
     name: "LED Strip Chipset"
-    disabled_by_default: true
     icon: mdi:chip
     entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 23
     optimistic: true
     restore_value: true
     options:
@@ -145,9 +386,12 @@ select:
   - platform: template
     id: led_strip_music_effect
     name: "LED Strip Music Effect"
-    disabled_by_default: true
     icon: mdi:music-circle
     entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 24
     optimistic: true
     restore_value: true
     options:
@@ -161,14 +405,63 @@ select:
       - "Pulse"
     initial_option: "Rainbow"
 
+  # Patterns for the Effect A / Effect B slots; the slot effect picks the
+  # pattern by position, so new patterns go at the end
+  - platform: template
+    id: led_strip_effect_a_pattern
+    name: "LED Strip Effect A Pattern"
+    icon: mdi:animation-play
+    entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 11
+    optimistic: true
+    restore_value: true
+    options:
+      - "Flicker"
+      - "Strobe"
+      - "Rainbow"
+      - "Color Wipe"
+      - "Scan"
+      - "Twinkle"
+      - "Pulse"
+      - "Fireworks"
+    initial_option: "Flicker"
+
+  - platform: template
+    id: led_strip_effect_b_pattern
+    name: "LED Strip Effect B Pattern"
+    icon: mdi:animation-play
+    entity_category: config
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 14
+    optimistic: true
+    restore_value: true
+    options:
+      - "Flicker"
+      - "Strobe"
+      - "Rainbow"
+      - "Color Wipe"
+      - "Scan"
+      - "Twinkle"
+      - "Pulse"
+      - "Fireworks"
+    initial_option: "Strobe"
+
 switch:
   # Music Mode: the strip turns on with the Music Effect while audio plays and
-  # off once playback has stopped for 10s
+  # off 3 s after playback stops
   - platform: template
     id: led_strip_music_mode
     name: "LED Strip Music Mode"
-    disabled_by_default: true
     icon: mdi:music-note
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 25
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
@@ -215,9 +508,12 @@ button:
   - platform: template
     id: led_strip_test_button
     name: "LED Strip Test"
-    disabled_by_default: true
     icon: mdi:led-strip-variant
     entity_category: diagnostic
+    disabled_by_default: true
+    web_server:
+      sorting_group_id: sg_led_strip
+      sorting_weight: 30
     on_press:
       - script.execute: led_strip_test
 
@@ -230,14 +526,15 @@ script:
       - lambda: |-
           auto *out = id(led_strip_output);
           // Blank every pixel the buffers cover, so LEDs past a lowered count go dark
-          out->set_num_leds(300);
+          out->set_num_leds(${led_strip_num_leds});
           for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
           out->write_state(id(led_strip));
-          out->set_num_leds((uint16_t) count);
+          // Never past the buffers, even if a count was saved under a larger maximum
+          out->set_num_leds((uint16_t) clamp<int>(count, 1, ${led_strip_num_leds}));
           out->clear_effect_data();
           // Repaint the current color at the new length (effects repaint themselves)
           out->update_state(id(led_strip));
-          ESP_LOGI("led_strip", "Driving %d LEDs", count);
+          ESP_LOGI("led_strip", "Driving %d LEDs", (int) out->size());
 
   - id: led_strip_apply_max_brightness
     parameters:
@@ -300,7 +597,7 @@ script:
           // during a reboot or an earlier, longer count
           auto *out = id(led_strip_output);
           const uint16_t count = out->size();
-          out->set_num_leds(300);
+          out->set_num_leds(${led_strip_num_leds});
           for (int32_t i = 0; i < out->size(); i++) (*out)[i] = Color::BLACK;
           out->write_state(id(led_strip));
           out->set_num_leds(count);
