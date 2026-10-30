@@ -81,7 +81,7 @@ light:
 
       # Effect A and Effect B run the pattern their Pattern select picks, at
       # their own Speed. Partition lights in the device YAML can
-      # list the same two entries (see the README)
+      # list the same two entries (https://esphome.io/components/light/partition/)
       - addressable_lambda:
           name: "Effect A"
           # About one frame per main-loop pass (~16 ms); the helper keeps its
@@ -332,7 +332,8 @@ number:
     step: 1
     optimistic: true
     restore_value: true
-    initial_value: 80
+    # Strobe at 45 flashes about twice a second, under the 3 Hz photosensitivity limit
+    initial_value: 45
 
 select:
   - platform: template
@@ -452,7 +453,7 @@ select:
 
 switch:
   # Music Mode: the strip turns on with the Music Effect while audio plays and
-  # off once playback has stopped for 10s
+  # off 3 s after playback stops
   - platform: template
     id: led_strip_music_mode
     name: "LED Strip Music Mode"

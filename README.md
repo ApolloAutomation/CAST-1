@@ -38,7 +38,7 @@ Configure every button without leaving Home Assistant using the [CAST-1 WizMote 
 While an announcement plays, music ducks and the onboard LED lights up. Two sliders in Home Assistant set how much:
 
 - **Announcement Ducking** (−80 to 0 dB, default −40) is how far the music drops. 0 turns ducking off.
-- **Announcement LED Brightness** (0–100%, default 100%) is how bright the onboard LED is. 0 keeps the LED off.
+- **Announcement LED Brightness** (0–100%, default 50%) is how bright the onboard LED is. 0 keeps the LED off.
 
 ## External LED Strip
 
@@ -58,12 +58,12 @@ The strip's settings live in Home Assistant and under **External LED Strip** on 
   - **Pulse** fades the whole strip from off to full and back.
   - **Fireworks** lights random sparks that spread and fade.
 
-In automations, set the pattern and speed with `select.select_option` and `number.set_value`, then call `light.turn_on` with `effect: "Effect A"` (add `transition: 0` for an instant start).
+In automations, set the pattern and speed with `select.select_option` and `number.set_value`, then call `light.turn_on` with `effect: "Effect A"`.
 
 > [!WARNING]
 > **Photosensitivity:** Strobe flashes faster than 3 times per second from about Speed 50 up, and reaches about 16 flashes per second at Speed 100. Pulse passes 3 per second from about Speed 75. Flashing in this range can trigger seizures in people with photosensitive epilepsy.
 
-Power long strips from their own 5V supply with a shared ground; the header can't supply a full-brightness strip, and **LED Strip Max Brightness** (default 50%) caps the draw.
+Power long strips from their own 5V supply with a shared ground; the header can't supply a full-brightness strip, and **LED Strip Max Brightness** (default 50%) caps the draw. It doesn't reach partition lights, so give each partition its own `color_correct`.
 
 Links: \
 Discord (Support/feedback/discussion/future products): [http://dsc.gg/ApolloAutomation](http://dsc.gg/ApolloAutomation) \

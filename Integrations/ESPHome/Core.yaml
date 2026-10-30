@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.10.25.1"
+  version: "26.10.30.1"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -18,7 +18,7 @@ esphome:
   min_version: 2026.10.0
   platformio_options:
     board_build.flash_mode: dio
-  # List form so package on_boot entries (wizmote.yaml) merge
+  # List form so package on_boot entries (wizmote.yaml, led_strip.yaml) merge
   on_boot:
     - priority: 800
       then:
@@ -62,6 +62,19 @@ esphome:
     - priority: -100
       then:
         - script.execute: apply_ota_source
+    # Firmware before ESPHome 2026.10 saved volume 0 as muted, and volume no
+    # longer clears mute; unmute that once (silent at volume 0)
+    - priority: -100
+      then:
+        - if:
+            condition:
+              and:
+                - lambda: "return !id(zero_volume_mute_fixed);"
+                - media_player.is_muted: external_media_player
+                - lambda: "return id(external_media_player).volume < 0.001f;"
+            then:
+              - media_player.unmute: external_media_player
+        - lambda: "id(zero_volume_mute_fixed) = true;"
     # Ethernet never came up, so bring WiFi back for rejoin or provisioning
     - priority: -100
       then:
@@ -252,6 +265,11 @@ api:
   encryption:
 
 globals:
+  # Set after the one-time volume-0 unmute check on first boot
+  - id: zero_volume_mute_fixed
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
   - id: cycleCounter
     type: int
     restore_value: no
@@ -506,7 +524,7 @@ number:
     step: 1
     optimistic: true
     restore_value: true
-    initial_value: 100
+    initial_value: 50
 
 select:
   - platform: template
@@ -623,12 +641,16 @@ media_player:
             - lambda: return (!id(announcement_triggered));
           then:
             - lambda: id(announcement_triggered) = true;
-            - light.turn_on:
-                id: rgb_light
-                blue: 100%
-                red: 0%
-                green: 100%
-                brightness: !lambda "return id(announcement_led_brightness).state / 100.0f;"
+            - if:
+                condition:
+                  lambda: "return id(announcement_led_brightness).state > 0;"
+                then:
+                  - light.turn_on:
+                      id: rgb_light
+                      blue: 100%
+                      red: 0%
+                      green: 100%
+                      brightness: !lambda "return id(announcement_led_brightness).state / 100.0f;"
             - mixer_speaker.apply_ducking:
                 id: media_mixer_input
                 decibel_reduction: !lambda "return (uint8_t) -id(announcement_ducking).state;"
