@@ -268,6 +268,8 @@ script:
           condition:
             lambda: 'return action == "Volume Up";'
           then:
+            # Volume no longer clears mute on its own (ESPHome 2026.10)
+            - media_player.unmute: external_media_player
             - media_player.volume_up: external_media_player
             - logger.log:
                 tag: wizmote
@@ -464,13 +466,14 @@ espnow:
           // Lets ETH channel-scan lock on
           id(wizmote_last_packet_ms) = millis();
 
-          uint32_t sequence = (data[4] << 24) | (data[3] << 16) | (data[2] << 8) | data[1];
+          uint32_t sequence = ((uint32_t) data[4] << 24) | ((uint32_t) data[3] << 16) |
+                              ((uint32_t) data[2] << 8) | data[1];
           uint8_t button = data[6];
 
           if (sequence == id(wizmote_last_sequence)) return;
           id(wizmote_last_sequence) = sequence;
 
-          ESP_LOGI("wizmote", "Button: %d seq=%d from %s", button, sequence, sender_mac.c_str());
+          ESP_LOGI("wizmote", "Button: %u seq=%" PRIu32 " from %s", button, sequence, sender_mac.c_str());
           id(process_wizmote_button).execute(button);
 
 esphome:
