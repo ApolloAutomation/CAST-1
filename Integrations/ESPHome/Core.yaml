@@ -4,17 +4,11 @@ substitutions:
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
   beta_manifest_file: "manifest.json"
-  # How far music drops (in dB) while an announcement plays; set in the
-  # device YAML's substitutions to override it (0 = no ducking)
-  announcement_ducking_db: "40"
-  # Onboard LED brightness while an announcement plays (0%-100%)
-  announcement_led_brightness: "50%"
 
 
 packages:
   wizmote: !include wizmote.yaml
-  # The external LED strip (led_strip.yaml) is opt-in: add it to the
-  # package files in the device YAML
+  led_strip: !include led_strip.yaml
 
 esphome:
   friendly_name: Apollo CAST-1
@@ -483,6 +477,37 @@ light:
           min_brightness: 50%
           max_brightness: 100%
 
+number:
+  # How far music drops while an announcement plays (0 = no ducking)
+  - platform: template
+    id: announcement_ducking
+    name: "Announcement Ducking"
+    icon: mdi:volume-minus
+    entity_category: config
+    unit_of_measurement: "dB"
+    mode: slider
+    min_value: -80
+    max_value: 0
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: -40
+
+  # Onboard LED brightness while an announcement plays (0 = LED stays off)
+  - platform: template
+    id: announcement_led_brightness
+    name: "Announcement LED Brightness"
+    icon: mdi:brightness-percent
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: slider
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 100
+
 select:
   - platform: template
     id: firmware_channel
@@ -603,10 +628,10 @@ media_player:
                 blue: 100%
                 red: 0%
                 green: 100%
-                brightness: ${announcement_led_brightness}
+                brightness: !lambda "return id(announcement_led_brightness).state / 100.0f;"
             - mixer_speaker.apply_ducking:
                 id: media_mixer_input
-                decibel_reduction: ${announcement_ducking_db}
+                decibel_reduction: !lambda "return (uint8_t) -id(announcement_ducking).state;"
                 duration: 0.0s
             - wait_until:
                 media_player.is_announcing: external_media_player
