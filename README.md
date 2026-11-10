@@ -40,6 +40,10 @@ While an announcement plays, music ducks and the onboard LED lights up. Two slid
 - **Announcement Ducking** (−80 to 0 dB, default −40) is how far the music drops. 0 turns ducking off.
 - **Announcement LED Brightness** (0–100%, default 100%) is how bright the onboard LED is. 0 keeps the LED off.
 
+## Static Delay
+
+If a CAST-1 plays behind the other speakers in a group, such as when it feeds an external amplifier or soundbar, add a delay in Music Assistant to line it up. Open the CAST-1 player's settings and set **Static playback delay** (0–5000 ms). The CAST-1 saves the value and keeps it after a reboot. The setting is in Music Assistant only; it doesn't appear on the device page in Home Assistant.
+
 ## External LED Strip
 
 The 5V / GND / IO1 header drives an addressable LED strip (WS2812, SK6812, WS2811, APA106 or SM16703). The firmware supports it out of the box, but its entities are disabled by default, since most CAST-1s don't have a strip connected. To use one, open the CAST-1's device page in Home Assistant and enable the **LED Strip** entities.

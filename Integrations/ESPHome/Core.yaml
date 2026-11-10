@@ -581,6 +581,7 @@ sendspin:
 media_source:
   - platform: sendspin
     id: sendspin_source
+    static_delay_adjustable: true
 
   - platform: audio_http
     id: http_media_source
