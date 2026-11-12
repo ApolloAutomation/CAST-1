@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.10.30.1"
+  version: "26.11.12.1"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   stable_manifest_dir: "firmware"
@@ -14,8 +14,8 @@ esphome:
   friendly_name: Apollo CAST-1
   comment: Apollo CAST-1
   name_add_mac_suffix: true
-  # improv_ble (renamed from esp32_improv) needs 2026.10
-  min_version: 2026.10.0
+  # 24-bit Sendspin playback needs 2026.11
+  min_version: 2026.11.0
   platformio_options:
     board_build.flash_mode: dio
   # List form so package on_boot entries (wizmote.yaml, led_strip.yaml) merge
@@ -547,7 +547,7 @@ audio_dac:
     id: external_dac
     i2c_id: bus_a
     address: 0x4D
-    bits_per_sample: 16bit
+    bits_per_sample: 32bit
 
 i2s_audio:
 - id: i2s_out
@@ -560,7 +560,7 @@ speaker:
     i2s_audio_id: i2s_out
     sample_rate: 48000
     i2s_dout_pin: GPIO9
-    bits_per_sample: 16bit
+    bits_per_sample: 32bit
     dac_type: external
     channel: stereo
     timeout: never
@@ -578,17 +578,16 @@ speaker:
         timeout: never
 
   # These stacks must stay in internal RAM, so leave task_stack_in_psram unset
+  # Passthrough bit depth; the mixer widens without -3 dB
   - platform: resampler
     id: announcement_resampling_speaker
     output_speaker: announcement_mixer_input
     sample_rate: 48000
-    bits_per_sample: 16
 
   - platform: resampler
     id: media_resampling_speaker
     output_speaker: media_mixer_input
     sample_rate: 48000
-    bits_per_sample: 16
 
 
 sendspin:
@@ -599,6 +598,8 @@ sendspin:
 media_source:
   - platform: sendspin
     id: sendspin_source
+    # FLAC and PCM arrive in 24-bit; Opus stays 16-bit
+    bits_per_sample: 24
     static_delay_adjustable: true
 
   - platform: audio_http
