@@ -318,6 +318,8 @@ web_server:
   id: web_server_1
   port: 80
   version: 3
+  # No firmware upload from the device page; the setup hotspot still allows it
+  ota: false
 
 http_request:
   id: http_request_1
