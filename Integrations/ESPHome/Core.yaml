@@ -1,5 +1,5 @@
 substitutions:
-  version: "26.11.16.3"
+  version: "26.11.17.1"
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   ota_stable_manifest: "${stable_manifest_base}/firmware/manifest.json"
