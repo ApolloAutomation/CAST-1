@@ -1,5 +1,6 @@
 substitutions:
   version: "26.11.19.1"
+
   stable_manifest_base: "https://apolloautomation.github.io/CAST-1"
   beta_manifest_base: "https://github.com/ApolloAutomation/CAST-1/releases/download/beta-fw"
   ota_stable_manifest: "${stable_manifest_base}/firmware/manifest.json"
@@ -16,7 +17,7 @@ esphome:
   comment: Apollo CAST-1
   name_add_mac_suffix: true
   # improv_ble (renamed from esp32_improv) needs 2026.10
-  min_version: 2026.10.0
+  min_version: 2026.10.1
   includes:
     - <lwip/dns.h>
   platformio_options:
@@ -345,11 +346,7 @@ button:
     on_press:
       - logger.log: "Applying firmware update for the selected channel"
       - delay: 3s
-      - script.execute: apply_ota_source
-      - script.wait: apply_ota_source
-      # Give async manifest fetch time to land
-      - delay: 5s
-      - lambda: id(update_http_request).perform(true);
+      - script.execute: install_selected_channel
 
 binary_sensor:
   - platform: status
@@ -371,19 +368,27 @@ binary_sensor:
             id(button_press_timestamp) = millis();
     on_release:
       then:
-        - lambda: |-
-            // Tap: status + self-test; 3-10s: nothing (mains); 10s+: factory reset
-            if (millis() - id(button_press_timestamp) >= 10000) {
-              id(factory_reset_switch).turn_on();
-            }
-            else if (millis() - id(button_press_timestamp) < 3000) {
-              // StatusCheck
-              id(statusCheck).execute();
-              delay(3000);
-              id(testCycleCount) = 0;
-              id(runTest) = true;
-              id(testScript).execute();
-            }
+        # Tap: status + self-test; 3-10s: nothing (mains); 10s+: factory reset
+        - if:
+            condition:
+              lambda: "return millis() - id(button_press_timestamp) >= 10000;"
+            then:
+              - switch.turn_on: factory_reset_switch
+            else:
+              - if:
+                  condition:
+                    lambda: "return millis() - id(button_press_timestamp) < 3000;"
+                  then:
+                    - script.execute: statusCheck
+                    - script.wait: statusCheck
+                    # Keep the status colour up a little longer; a blocking
+                    # delay here would stall the main loop
+                    - delay: 3s
+                    - light.turn_off: rgb_light
+                    - lambda: |-
+                        id(testCycleCount) = 0;
+                        id(runTest) = true;
+                    - script.execute: testScript
 
 sensor:
   - platform: internal_temperature
@@ -794,6 +799,57 @@ script:
           ESP_LOGI("firmware", "OTA manifest set to: %s", url);
           id(update_http_request).set_source_url(url);
       - component.update: update_http_request
+  # The update component drops a check requested while another one is running,
+  # so keep asking until install_selected_channel has what it needs.
+  - id: request_channel_manifest
+    mode: restart
+    then:
+      - repeat:
+          count: 4
+          then:
+            - script.execute: apply_ota_source
+            - script.wait: apply_ota_source
+            - delay: 5s
+  # Forced install, but only of a manifest fetched after this press from the
+  # selected channel. mode single: a second press while this runs is ignored.
+  - id: install_selected_channel
+    mode: single
+    then:
+      # Mark the cached firmware URL as old. Only a successful check replaces it.
+      - lambda: |-
+          std::string &fw = const_cast<std::string &>(id(update_http_request).update_info.firmware_url);
+          if (fw.rfind('!', 0) != 0) fw.insert(0, "!");
+      - script.execute: request_channel_manifest
+      # Wait for a check without error whose firmware sits in the directory of
+      # the selected channel's manifest (relative Pages paths are merged with
+      # it, beta paths are release-asset URLs in the same directory).
+      - wait_until:
+          timeout: 20s
+          condition:
+            lambda: |-
+              const char *src = id(update_http_request).get_source_url();
+              const size_t dir = strrchr(src, '/') - src + 1;
+              return !id(update_http_request).status_has_error() &&
+                     strncmp(id(update_http_request).update_info.firmware_url.c_str(), src, dir) == 0;
+      - script.stop: request_channel_manifest
+      - lambda: |-
+          std::string &fw = const_cast<std::string &>(id(update_http_request).update_info.firmware_url);
+          const char *src = id(update_http_request).get_source_url();
+          const size_t dir = strrchr(src, '/') - src + 1;
+          const bool err = id(update_http_request).status_has_error();
+          const char *why = nullptr;
+          if (fw.rfind('!', 0) == 0) {
+            why = err ? "the manifest check failed" : "no manifest arrived within 20s";
+            fw.erase(0, 1);  // put the old URL back for the update entity
+          } else if (err || strncmp(fw.c_str(), src, dir) != 0) {
+            why = "the manifest that arrived is not from the selected channel";
+          }
+          if (why != nullptr) {
+            ESP_LOGW("firmware", "Firmware Update: %s (%s); not installing", why, src);
+            return;
+          }
+          ESP_LOGI("firmware", "Installing %s", fw.c_str());
+          id(update_http_request).perform(true);
   - id: statusCheck
     then:
       - if:
@@ -807,8 +863,30 @@ script:
                 red: 0%
                 green: 0%
                 blue: 100%
+          else:
+            - if:
+                condition:
+                  or:
+                    - ethernet.connected:
+                    - wifi.connected:
+                then:
+                  - logger.log: "Apollo Automation: Connected To Network"
+                  - light.turn_on:
+                      id: rgb_light
+                      brightness: 100%
+                      red: 0%
+                      green: 100%
+                      blue: 0%
+                else:
+                  - logger.log: "Apollo Automation: Not Connected To Network"
+                  - light.turn_on:
+                      id: rgb_light
+                      brightness: 100%
+                      red: 100%
+                      green: 100%
+                      blue: 0%
+      # The caller turns the light off, so the colour stays up until then
       - delay: 5s
-      - light.turn_off: rgb_light
   
   - id: testScript
     # A second press reruns it, clearing runTest
@@ -829,10 +907,10 @@ script:
                 - delay: 1s
                 - lambda: "id(testCycleCount) += 1;"
 
-          ## TODO: Update
+          # Pass if the DAC came up over I2C
           - if:
               condition:
-                - lambda: "return true;"
+                - lambda: "return !id(external_dac).is_failed();"
               then:
                 - lambda: "id(runTest) = false;"
                 - light.turn_on:
