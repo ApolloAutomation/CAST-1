@@ -16,6 +16,12 @@ variant or reflash to switch:
   never loses the device when you plug or unplug the cable. If WiFi has no
   network to join, it turns off entirely — the setup hotspot is never active
   while Ethernet is connected.
+- **Ethernet Only:** enable this switch on the device page (Configuration,
+  disabled by default) and turn it on to switch WiFi off whenever Ethernet
+  is connected, so the device is only reachable over the cable. WiFi comes
+  back if the cable is unplugged. If Home Assistant added the device by its
+  WiFi IP, it may show it as unavailable afterwards: restart Home Assistant
+  or change the device's host to its wired IP.
 - **No Ethernet:** WiFi works as usual. The device rejoins its saved
   network, or opens the "Apollo CAST 1 Hotspot" for setup if none is
   configured (Improv via Bluetooth or USB works too).
